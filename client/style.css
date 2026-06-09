@@ -1,68 +1,146 @@
 body {
-  font-family: system-ui;
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
   max-width: 480px;
   margin: 0 auto;
-  padding: 16px;
+  overflow-x: hidden;
   background: #fff;
-  color: #000;
+  color: #111;
 }
 
-video {
+/* 步驟容器 */
+.wizard-track {
+  display: flex;
+  width: 600%; /* 6 步驟 */
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wizard-step {
+  width: calc(100vw - 0px);
+  max-width: 480px;
+  min-height: 100dvh;
+  padding: 32px 20px 24px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+/* 進度條 */
+.progress-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 24px;
+}
+.progress-dot {
+  height: 4px;
+  flex: 1;
+  background: #ddd;
+  border-radius: 2px;
+  transition: background 0.3s;
+}
+.progress-dot.active { background: #111; }
+.progress-dot.done { background: #555; }
+
+.step-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.step-hint {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0 0 24px;
+}
+
+/* 拍照區 */
+.capture-area {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  aspect-ratio: 16/10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 16px;
+  position: relative;
+}
+.capture-area video,
+.capture-area img {
   width: 100%;
-  display: block;
-  margin-bottom: 8px;
+  height: 100%;
+  object-fit: cover;
+}
+.capture-placeholder {
+  color: #aaa;
+  font-size: 0.85rem;
 }
 
+/* 按鈕 */
 button {
   display: block;
   width: 100%;
-  padding: 10px;
-  margin-bottom: 8px;
-  background: #fff;
-  color: #000;
-  border: 1px solid #000;
-  border-radius: 0;
+  padding: 14px;
   font-size: 1rem;
+  background: #111;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
+  margin-bottom: 8px;
+}
+button.secondary {
+  background: #fff;
+  color: #111;
+  border: 1px solid #ddd;
+}
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
 }
 
-button:active {
-  background: #eee;
+/* 表單欄位 */
+.field-group { margin-bottom: 20px; }
+label { display: block; font-size: 0.8rem; color: #555; margin-bottom: 4px; }
+input[type="text"], input[type="password"], input[type="date"] {
+  width: 100%;
+  padding: 10px;
+  font-size: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+  background: #fff;
 }
-
-label#btn-upload {
+input[type="text"]:focus, input[type="password"]:focus {
+  outline: 2px solid #111;
+  border-color: transparent;
+}
+.field-error {
+  font-size: 0.78rem;
+  color: #111;
   display: block;
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 8px;
-  border: 1px solid #000;
-  font-size: 1rem;
-  cursor: pointer;
-  box-sizing: border-box;
-  text-align: center;
+  margin-top: 4px;
+  border-left: 2px solid #111;
+  padding-left: 6px;
 }
 
-form {
+/* 確認畫面 */
+.confirm-section { margin-bottom: 24px; }
+.confirm-section h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin: 0 0 12px; }
+.confirm-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.95rem; }
+.confirm-row .label { color: #666; }
+
+/* 完成畫面 */
+.done-screen { text-align: center; padding-top: 80px; }
+.done-screen .checkmark { font-size: 3rem; margin-bottom: 16px; }
+
+/* 錯誤/失效畫面 */
+#view-invalid, #view-error {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-input {
-  width: 100%;
-  padding: 8px;
-  font-size: 1rem;
-  border: 1px solid #000;
-  border-radius: 0;
-  box-sizing: border-box;
-  background: #fff;
-  color: #000;
-}
-
-input:invalid {
-  outline: 2px solid #000;
-}
-
-input[type="date"] {
-  font-family: system-ui;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 32px 20px;
+  text-align: center;
+  color: #666;
 }

@@ -1,156 +1,245 @@
-import { AppState } from './state.js'
 import { startCamera, stopCamera, captureFrame, fileToCanvas } from './camera.js'
-import { applyWatermark } from './watermark.js'
+import { applyWatermark, sha256, canvasToBlob } from './watermark.js'
 import { ocrCard } from './ocr-card.js'
 import { ocrId } from './ocr-id.js'
 import { luhn, validateTwId, notExpired, setError, clearError } from './validate.js'
 import { submitData } from './api.js'
 
 const tokenId = new URLSearchParams(location.search).get('token')
-const app = new AppState()
+let currentStep = 0
 let cameraStream = null
+const collectedData = {
+  idFrontBlob: null, idBackBlob: null,
+  cardFrontBlob: null, cardBackBlob: null,
+  photoHashes: [],
+  ocr: {}
+}
 
-// View router
-app.on((state, data) => {
-  document.querySelectorAll('[id^="view-"]').forEach(el => el.hidden = true)
-  const view = document.getElementById(`view-${state}`)
-  if (view) view.hidden = false
-  if (state === 'error') {
-    document.getElementById('view-error').textContent = data.message ?? '發生錯誤'
+// --- View helpers ---
+function showView(id) {
+  ['view-loading','view-invalid','view-error','wizard','view-done'].forEach(v => {
+    const el = document.getElementById(v)
+    if (el) el.hidden = (v !== id)
+  })
+}
+
+function goToStep(n) {
+  currentStep = n
+  const track = document.getElementById('wizard-track')
+  const stepWidth = Math.min(window.innerWidth, 480)
+  track.style.transform = `translateX(-${n * stepWidth}px)`
+  updateProgress(n)
+}
+
+function updateProgress(n) {
+  document.querySelectorAll('.progress-dot').forEach((dot, i) => {
+    dot.classList.toggle('done', i < n)
+    dot.classList.toggle('active', i === n)
+  })
+}
+
+// --- Camera helpers ---
+async function setupCapture(stepNum, videoContainerId, btnCaptureId, fileInputId, fieldsId, btnNextId, processCallback) {
+  const container = document.getElementById(videoContainerId)
+  const btnCapture = document.getElementById(btnCaptureId)
+  const fileInput = document.getElementById(fileInputId)
+
+  let video = document.createElement('video')
+  video.autoplay = true
+  video.playsInline = true
+  video.style.cssText = 'width:100%;height:100%;object-fit:cover;'
+
+  try {
+    cameraStream = await startCamera(video)
+    container.innerHTML = ''
+    container.appendChild(video)
+  } catch {
+    btnCapture.hidden = true
   }
-})
 
+  btnCapture.onclick = async () => {
+    const canvas = captureFrame(video)
+    stopCamera(cameraStream)
+    await processCapture(canvas, container, fieldsId, btnNextId, processCallback)
+  }
+
+  fileInput.onchange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    stopCamera(cameraStream)
+    const canvas = await fileToCanvas(file)
+    await processCapture(canvas, container, fieldsId, btnNextId, processCallback)
+  }
+}
+
+async function processCapture(canvas, container, fieldsId, btnNextId, processCallback) {
+  const preview = document.createElement('img')
+  preview.style.cssText = 'width:100%;height:100%;object-fit:cover;'
+  container.innerHTML = ''
+
+  const { blob, hash } = await applyWatermark(canvas, tokenId)
+  collectedData.photoHashes.push(hash)
+
+  preview.src = URL.createObjectURL(blob)
+  container.appendChild(preview)
+
+  if (fieldsId) {
+    const fields = document.getElementById(fieldsId)
+    if (fields) fields.hidden = false
+    processCallback(blob, hash)
+  }
+
+  document.getElementById(btnNextId).disabled = false
+  return blob
+}
+
+// --- OCR handlers ---
+async function processIdFront(blob) {
+  try {
+    const result = await ocrId(blob)
+    if (result.name) document.getElementById('id-name').value = result.name
+    if (result.id_number) document.getElementById('id-number').value = result.id_number
+    if (result.birth_date) document.getElementById('id-birth').value = result.birth_date
+    collectedData.ocr.idFront = result
+  } catch {}
+}
+
+async function processCardFront(blob) {
+  try {
+    const result = await ocrCard(blob)
+    if (result.card_number) document.getElementById('card-number').value = result.card_number.replace(/(.{4})/g, '$1 ').trim()
+    if (result.expiry) document.getElementById('card-expiry').value = result.expiry
+    if (result.holder_name) document.getElementById('card-holder').value = result.holder_name
+    collectedData.ocr.cardFront = result
+  } catch {}
+}
+
+async function processCardBack(blob) {
+  try {
+    const worker = await Tesseract.createWorker('eng')
+    const url = URL.createObjectURL(blob)
+    const { data } = await worker.recognize(url)
+    URL.revokeObjectURL(url)
+    await worker.terminate()
+    const cvvMatch = data.text.match(/\b\d{3,4}\b/)
+    if (cvvMatch) document.getElementById('card-cvv').value = cvvMatch[0]
+  } catch {}
+}
+
+// --- Step navigation ---
+function setupNextButton(btnId, validator, onNext) {
+  const btn = document.getElementById(btnId)
+  btn.onclick = () => {
+    if (validator && !validator()) return
+    onNext()
+  }
+}
+
+// --- Init ---
 async function init() {
-  if (!tokenId) { app.transition('invalid'); return }
+  if (!tokenId) { showView('view-invalid'); return }
 
   try {
     const res = await fetch(`/api/token/${tokenId}/open`, { method: 'POST' })
-    if (!res.ok) { app.transition('invalid'); return }
-    app.transition('capture')
-    initCapture()
+    if (!res.ok) { showView('view-invalid'); return }
   } catch {
-    app.transition('error', { message: '網路錯誤，請稍後再試' })
-  }
-}
-
-function initCapture() {
-  const video = document.getElementById('camera-preview')
-  const btnCapture = document.getElementById('btn-capture')
-  const fileInput = document.querySelector('#btn-upload input')
-
-  startCamera(video).then(stream => { cameraStream = stream }).catch(() => {
-    video.hidden = true
-    btnCapture.hidden = true
-  })
-
-  btnCapture.addEventListener('click', async () => {
-    const canvas = captureFrame(video)
-    await processImage(canvas)
-  })
-
-  fileInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    const canvas = await fileToCanvas(file)
-    await processImage(canvas)
-  })
-}
-
-async function processImage(canvas) {
-  app.transition('loading')
-  try {
-    const { blob, hash } = await applyWatermark(canvas, tokenId)
-    stopCamera(cameraStream)
-
-    const [cardResult, idResult] = await Promise.allSettled([
-      ocrCard(blob),
-      ocrId(blob),
-    ])
-
-    app.transition('confirm', {
-      photo_blob: blob,
-      photo_hash: hash,
-      ocr_card: cardResult.status === 'fulfilled' ? cardResult.value : {},
-      ocr_id: idResult.status === 'fulfilled' ? idResult.value : {},
-    })
-
-    prefillForm(app.data)
-  } catch (err) {
-    app.transition('error', { message: '處理圖片時發生錯誤' })
-  }
-}
-
-function prefillForm(data) {
-  const f = document.getElementById('form-confirm')
-  if (data.ocr_card?.card_number) f.card_number.value = data.ocr_card.card_number
-  if (data.ocr_card?.expiry) f.expiry.value = data.ocr_card.expiry
-  if (data.ocr_id?.id_number) f.id_number.value = data.ocr_id.id_number
-  if (data.ocr_id?.name) f.name.value = data.ocr_id.name
-  if (data.ocr_id?.birth_date) f.birth_date.value = data.ocr_id.birth_date
-}
-
-// Phase 4 補完 form submit handler
-document.getElementById('form-confirm')?.addEventListener('submit', async (e) => {
-  e.preventDefault()
-  const f = e.target
-  let valid = true
-
-  // 卡號驗證
-  const cardNum = f.card_number.value.replace(/\s|-/g, '')
-  if (!luhn(cardNum)) {
-    setError(f.card_number, '卡號無效')
-    valid = false
-  } else clearError(f.card_number)
-
-  // 到期日驗證
-  if (!notExpired(f.expiry.value)) {
-    setError(f.expiry, '卡片已過期')
-    valid = false
-  } else clearError(f.expiry)
-
-  // 身分證驗證
-  if (!validateTwId(f.id_number.value)) {
-    setError(f.id_number, '身分證字號無效')
-    valid = false
-  } else clearError(f.id_number)
-
-  if (!valid) return
-
-  const { photo_blob, photo_hash } = app.data
-  if (!photo_blob || !photo_hash) {
-    app.transition('error', { message: '請重新拍照' })
+    showView('view-error')
+    document.getElementById('view-error').textContent = '網路錯誤，請稍後再試。'
     return
   }
 
-  try {
-    await submitData(tokenId, {
-      card_number: f.card_number.value,
-      expiry: f.expiry.value,
-      holder_name: f.holder_name?.value,
-      name: f.name.value,
-      id_number: f.id_number.value,
-      birth_date: f.birth_date.value,
-      installment: f.installment?.value,
-    }, photo_blob, photo_hash)
+  showView('wizard')
+  goToStep(0)
 
-    // CVV 送出：透過單獨的 fetch（不存 DB）
-    if (f.cvv.value) {
-      await fetch(`/api/token/${tokenId}/cvv`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token_id: tokenId, cvv: f.cvv.value }),
-      })
-      f.cvv.value = ''
-    }
+  // Setup step 0: 身分證正面
+  await setupCapture(0, 'capture-id-front', 'btn-capture-id-front', 'file-id-front', 'fields-id-front', 'btn-next-0', processIdFront)
+  setupNextButton('btn-next-0', null, () => goToStep(1))
 
-    app.transition('done')
-  } catch (err) {
-    if (err.message === 'ALREADY_SUBMITTED') {
-      app.transition('error', { message: '資料已送出，請勿重複操作。' })
-    } else {
-      app.transition('error', { message: '送出失敗，請重試。' })
+  // Setup step 1: 身分證背面（拍完即可下一步，無 OCR fields）
+  await setupCapture(1, 'capture-id-back', 'btn-capture-id-back', 'file-id-back', null, 'btn-next-1', () => {})
+  setupNextButton('btn-next-1', null, () => goToStep(2))
+
+  // Setup step 2: 信用卡正面
+  await setupCapture(2, 'capture-card-front', 'btn-capture-card-front', 'file-card-front', 'fields-card-front', 'btn-next-2', processCardFront)
+  setupNextButton('btn-next-2', null, () => goToStep(3))
+
+  // Setup step 3: 信用卡背面 + CVV
+  await setupCapture(3, 'capture-card-back', 'btn-capture-card-back', 'file-card-back', null, 'btn-next-3', processCardBack)
+  document.getElementById('card-cvv').addEventListener('input', (e) => {
+    document.getElementById('btn-next-3').disabled = e.target.value.length < 3
+  })
+  setupNextButton('btn-next-3', null, () => {
+    fillConfirm()
+    goToStep(4)
+  })
+
+  // Step 4: 確認送出
+  document.getElementById('btn-back-to-edit').onclick = () => goToStep(2)
+
+  document.getElementById('btn-submit').onclick = async () => {
+    const btn = document.getElementById('btn-submit')
+    btn.disabled = true
+    btn.textContent = '送出中...'
+    try {
+      await doSubmit()
+      showView('view-done')
+    } catch (err) {
+      btn.disabled = false
+      btn.textContent = '確認送出'
+      alert(err.message === 'ALREADY_SUBMITTED' ? '資料已送出，請勿重複操作。' : '送出失敗，請重試。')
     }
   }
-})
+}
+
+function fillConfirm() {
+  document.getElementById('confirm-name').textContent = document.getElementById('id-name').value
+  document.getElementById('confirm-id-number').textContent = document.getElementById('id-number').value
+  document.getElementById('confirm-birth').textContent = document.getElementById('id-birth').value
+  const cn = document.getElementById('card-number').value.replace(/\s/g, '')
+  document.getElementById('confirm-card-number').textContent = cn.slice(0,4) + ' •••• •••• ' + cn.slice(-4)
+  document.getElementById('confirm-expiry').textContent = document.getElementById('card-expiry').value
+  const inst = document.getElementById('card-installment').value
+  document.getElementById('confirm-installment').textContent = inst ? `${inst} 期` : '一次付清'
+}
+
+async function doSubmit() {
+  const cardNum = document.getElementById('card-number').value.replace(/\s/g, '')
+  const cvv = document.getElementById('card-cvv').value
+  const photoHash = collectedData.photoHashes[0] ?? ''
+
+  await submitData(tokenId, {
+    card_number: cardNum,
+    expiry: document.getElementById('card-expiry').value,
+    holder_name: document.getElementById('card-holder').value || undefined,
+    name: document.getElementById('id-name').value,
+    id_number: document.getElementById('id-number').value,
+    birth_date: document.getElementById('id-birth').value,
+    installment: document.getElementById('card-installment').value || undefined,
+    extra_photo_hashes: collectedData.photoHashes.slice(1),
+  }, collectedData.idFrontBlob || new Blob(), photoHash)
+
+  if (cvv) {
+    await fetch(`/api/token/${tokenId}/cvv`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token_id: tokenId, cvv }),
+    })
+  }
+}
+
+// 修正 wizard-track 寬度（動態計算）
+function fixTrackWidth() {
+  const track = document.getElementById('wizard-track')
+  if (!track) return
+  const stepWidth = Math.min(window.innerWidth, 480)
+  document.querySelectorAll('.wizard-step').forEach(s => {
+    s.style.width = stepWidth + 'px'
+  })
+  track.style.width = (stepWidth * 5) + 'px'
+  track.style.transform = `translateX(-${currentStep * stepWidth}px)`
+}
+
+window.addEventListener('resize', fixTrackWidth)
+document.addEventListener('DOMContentLoaded', fixTrackWidth)
 
 init()

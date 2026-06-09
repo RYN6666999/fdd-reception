@@ -9,8 +9,99 @@ body {
   font-size: 14px;
   color: #1a1a1a;
   background: #f5f5f5;
-  padding: 16px;
+  padding: 0;
 }
+
+/* Tab 導航 */
+#tab-nav {
+  display: flex;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 8px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  margin: 0;
+  border-radius: 0;
+}
+
+.tab-btn.active {
+  color: #1a1a1a;
+  border-bottom-color: #1a1a1a;
+}
+
+.tab-panel {
+  padding: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* QR code */
+#qrcode-container {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+  background: #fff;
+  padding: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+#qrcode-container canvas,
+#qrcode-container img {
+  display: block;
+}
+
+/* 按鈕列 */
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* 歷史記錄 */
+.history-item {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.history-item .hi-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.history-item .hi-label { color: #666; }
+
+.history-status {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #f0f0f0;
+  color: #666;
+}
+
+.history-status.confirmed { background: #d4edda; color: #155724; }
+.history-status.uploaded { background: #fff3cd; color: #856404; }
+
+.loading-text { color: #999; text-align: center; padding: 32px 0; }
 
 #ws-status {
   position: fixed;
@@ -26,9 +117,12 @@ body {
 }
 
 [id^="view-"] {
-  max-width: 480px;
-  margin: 0 auto;
-  padding-top: 16px;
+  padding-top: 8px;
+}
+
+button.secondary {
+  color: #666;
+  background: #fff;
 }
 
 h3 {

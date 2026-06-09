@@ -5,6 +5,7 @@ import { handleDestroy } from './api/token/destroy'
 import { handleSubmit } from './api/token/submit'
 import { handleCvv } from './api/token/cvv'
 import { handleGetCard } from './api/token/card'
+import { handleOperatorHistory } from './api/operator/history'
 import { handleExpireTokens } from './cron/expire-tokens'
 import { handleCleanupSensitive } from './cron/cleanup-sensitive'
 
@@ -38,6 +39,9 @@ export default {
       if (method === 'POST' && action === 'cvv') return handleCvv(request, env, tokenId!)
       if (method === 'GET' && action === 'card') return handleGetCard(request, env, tokenId!)
     }
+
+    // GET /api/operator/history
+    if (method === 'GET' && path === '/api/operator/history') return handleOperatorHistory(request, env)
 
     // WebSocket: GET /api/session/:id/ws → proxy to Durable Object
     const sessionMatch = path.match(/^\/api\/session\/([^/]+)\/ws$/)

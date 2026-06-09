@@ -2,32 +2,153 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>資料送出</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="view-loading">載入中...</div>
-  <div id="view-invalid" hidden>此連結已失效，請聯繫業務人員。</div>
-  <div id="view-capture" hidden>
-    <video id="camera-preview" autoplay playsinline></video>
-    <button id="btn-capture">拍照</button>
-    <label id="btn-upload">選擇圖片<input type="file" accept="image/*" hidden></label>
+
+<!-- 失效/錯誤（在精靈外） -->
+<div id="view-invalid" hidden>此連結已失效，請聯繫業務人員。</div>
+<div id="view-error" hidden></div>
+<div id="view-loading" style="display:flex;align-items:center;justify-content:center;min-height:100dvh;">載入中...</div>
+
+<!-- 精靈主體 -->
+<div id="wizard" hidden>
+  <!-- 進度條 -->
+  <div class="progress-bar" id="progress-bar" style="position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:12px 20px 0;box-sizing:border-box;background:#fff;z-index:10;">
+    <div class="progress-dot" data-step="0"></div>
+    <div class="progress-dot" data-step="1"></div>
+    <div class="progress-dot" data-step="2"></div>
+    <div class="progress-dot" data-step="3"></div>
+    <div class="progress-dot" data-step="4"></div>
   </div>
-  <div id="view-confirm" hidden>
-    <form id="form-confirm">
-      <input type="text" name="card_number" placeholder="卡號" maxlength="19" required>
-      <input type="text" name="expiry" placeholder="MM/YY" maxlength="5" required>
-      <input type="password" name="cvv" placeholder="背面末三碼" maxlength="4" required autocomplete="off">
-      <input type="text" name="id_number" placeholder="身分證字號" maxlength="10" required>
-      <input type="text" name="name" placeholder="姓名" required>
-      <input type="date" name="birth_date" required>
-      <button type="submit">送出</button>
-    </form>
+
+  <div class="wizard-track" id="wizard-track" style="margin-top:28px;">
+
+    <!-- Step 0: 身分證正面 -->
+    <div class="wizard-step" id="step-0">
+      <p class="step-title">身分證正面</p>
+      <p class="step-hint">請對準身分證正面拍照，確保文字清晰可見。</p>
+      <div class="capture-area" id="capture-id-front">
+        <span class="capture-placeholder">點擊拍照或上傳</span>
+      </div>
+      <button id="btn-capture-id-front">拍照</button>
+      <label class="secondary" style="display:block;width:100%;padding:14px;font-size:1rem;border:1px solid #ddd;border-radius:4px;text-align:center;cursor:pointer;box-sizing:border-box;margin-bottom:8px;">
+        從相簿選擇
+        <input type="file" accept="image/*" hidden id="file-id-front">
+      </label>
+      <div class="field-group" id="fields-id-front" hidden>
+        <label>姓名</label>
+        <input type="text" id="id-name" placeholder="姓名">
+        <label style="margin-top:12px">身分證字號</label>
+        <input type="text" id="id-number" placeholder="A123456789" maxlength="10">
+        <label style="margin-top:12px">生日</label>
+        <input type="date" id="id-birth">
+      </div>
+      <button id="btn-next-0" disabled>下一步</button>
+    </div>
+
+    <!-- Step 1: 身分證背面 -->
+    <div class="wizard-step" id="step-1">
+      <p class="step-title">身分證背面</p>
+      <p class="step-hint">請翻到背面拍照。</p>
+      <div class="capture-area" id="capture-id-back">
+        <span class="capture-placeholder">點擊拍照或上傳</span>
+      </div>
+      <button id="btn-capture-id-back">拍照</button>
+      <label class="secondary" style="display:block;width:100%;padding:14px;font-size:1rem;border:1px solid #ddd;border-radius:4px;text-align:center;cursor:pointer;box-sizing:border-box;margin-bottom:8px;">
+        從相簿選擇
+        <input type="file" accept="image/*" hidden id="file-id-back">
+      </label>
+      <button id="btn-next-1" disabled>下一步</button>
+    </div>
+
+    <!-- Step 2: 信用卡正面 -->
+    <div class="wizard-step" id="step-2">
+      <p class="step-title">信用卡正面</p>
+      <p class="step-hint">請對準信用卡正面，確保卡號與有效期限清晰可見。</p>
+      <div class="capture-area" id="capture-card-front">
+        <span class="capture-placeholder">點擊拍照或上傳</span>
+      </div>
+      <button id="btn-capture-card-front">拍照</button>
+      <label class="secondary" style="display:block;width:100%;padding:14px;font-size:1rem;border:1px solid #ddd;border-radius:4px;text-align:center;cursor:pointer;box-sizing:border-box;margin-bottom:8px;">
+        從相簿選擇
+        <input type="file" accept="image/*" hidden id="file-card-front">
+      </label>
+      <div class="field-group" id="fields-card-front" hidden>
+        <label>卡號</label>
+        <input type="text" id="card-number" placeholder="1234 5678 9012 3456" maxlength="19">
+        <label style="margin-top:12px">有效期限</label>
+        <input type="text" id="card-expiry" placeholder="MM/YY" maxlength="5">
+        <label style="margin-top:12px">持卡人姓名（選填）</label>
+        <input type="text" id="card-holder" placeholder="CARD HOLDER NAME">
+      </div>
+      <button id="btn-next-2" disabled>下一步</button>
+    </div>
+
+    <!-- Step 3: 信用卡背面 + CVV -->
+    <div class="wizard-step" id="step-3">
+      <p class="step-title">信用卡背面</p>
+      <p class="step-hint">請翻到背面，確保末三碼簽名欄清晰可見。</p>
+      <div class="capture-area" id="capture-card-back">
+        <span class="capture-placeholder">點擊拍照或上傳</span>
+      </div>
+      <button id="btn-capture-card-back">拍照</button>
+      <label class="secondary" style="display:block;width:100%;padding:14px;font-size:1rem;border:1px solid #ddd;border-radius:4px;text-align:center;cursor:pointer;box-sizing:border-box;margin-bottom:8px;">
+        從相簿選擇
+        <input type="file" accept="image/*" hidden id="file-card-back">
+      </label>
+      <div class="field-group">
+        <label>背面末三碼（CVV）</label>
+        <input type="password" id="card-cvv" placeholder="•••" maxlength="4" autocomplete="off">
+      </div>
+      <div class="field-group">
+        <label>分期期數（選填）</label>
+        <select id="card-installment" style="width:100%;padding:10px;font-size:1rem;border:1px solid #ddd;border-radius:4px;">
+          <option value="">一次付清</option>
+          <option value="3">3 期</option>
+          <option value="6">6 期</option>
+          <option value="12">12 期</option>
+          <option value="24">24 期</option>
+          <option value="36">36 期</option>
+        </select>
+      </div>
+      <button id="btn-next-3" disabled>下一步</button>
+    </div>
+
+    <!-- Step 4: 確認所有資料 -->
+    <div class="wizard-step" id="step-4">
+      <p class="step-title">確認資料</p>
+      <p class="step-hint">請確認以下資料正確後送出。</p>
+      <div class="confirm-section">
+        <h3>身分證</h3>
+        <div class="confirm-row"><span class="label">姓名</span><span id="confirm-name"></span></div>
+        <div class="confirm-row"><span class="label">身分證字號</span><span id="confirm-id-number"></span></div>
+        <div class="confirm-row"><span class="label">生日</span><span id="confirm-birth"></span></div>
+      </div>
+      <div class="confirm-section">
+        <h3>信用卡</h3>
+        <div class="confirm-row"><span class="label">卡號</span><span id="confirm-card-number"></span></div>
+        <div class="confirm-row"><span class="label">有效期限</span><span id="confirm-expiry"></span></div>
+        <div class="confirm-row"><span class="label">分期</span><span id="confirm-installment"></span></div>
+      </div>
+      <button id="btn-submit">確認送出</button>
+      <button class="secondary" id="btn-back-to-edit">修改資料</button>
+    </div>
+
+  </div><!-- end wizard-track -->
+</div><!-- end wizard -->
+
+<!-- 完成 -->
+<div id="view-done" hidden>
+  <div class="done-screen">
+    <div class="checkmark">✓</div>
+    <p>資料已送出。</p>
   </div>
-  <div id="view-done" hidden>資料已送出。</div>
-  <div id="view-error" hidden></div>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script type="module" src="app.js"></script>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
