@@ -1,0 +1,20 @@
+{
+  "name": "fdd-reception",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "guard:specs": "node guards/check-specs.mjs",
+    "guard:contracts": "node guards/check-contracts.mjs",
+    "guard:types": "npx tsc --noEmit",
+    "guard:lint": "npx eslint contracts/ server/ --ext .ts",
+    "guard:all": "npm run guard:specs && npm run guard:contracts && npm run guard:types && npm run guard:lint",
+    "deploy": "npm run guard:all && npx wrangler pages deploy . --project-name fdd-reception --commit-dirty=true",
+    "dev": "npx wrangler pages dev ."
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "zod": "^3.22.0",
+    "wrangler": "^3.0.0"
+  }
+}
