@@ -23,4 +23,4 @@ new_sqlite_classes = ["SessionRoom"]
 crons = ["* * * * *", "0 2 * * *"]
 
 [vars]
-BASE_URL = "https://fdd-reception.workers.dev"
+BASE_URL = "https://fdd-reception.mandrill210025.workers.dev"
