@@ -1,10 +1,15 @@
 name = "fdd-reception"
-pages_build_output_dir = "."
+main = "functions/_worker.ts"
+compatibility_date = "2024-09-23"
+
+[assets]
+directory = "."
+not_found_handling = "none"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "fdd-reception"
-database_id = "TBD"
+database_id = "6b780531-c882-4415-8425-be84e5c52074"
 
 [[durable_objects.bindings]]
 name = "SESSION_ROOM"
@@ -12,7 +17,10 @@ class_name = "SessionRoom"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["SessionRoom"]
+new_sqlite_classes = ["SessionRoom"]
 
 [triggers]
 crons = ["* * * * *", "0 2 * * *"]
+
+[vars]
+BASE_URL = "https://fdd-reception.workers.dev"

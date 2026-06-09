@@ -1,0 +1,17 @@
+node_modules/
+.git/
+.wrangler/
+functions/
+contracts/
+specs/
+guards/
+server/
+*.toml
+*.json
+*.lock
+*.ts
+*.mjs
+*.sql
+*.md
+*.txt
+bun.lock
