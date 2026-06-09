@@ -45,7 +45,7 @@ idle ──發送連結──▶ waiting ──收到 uploaded──▶ reviewin
 - **CVV 顯示**：只在 `reviewing` 狀態顯示，離開頁面或切換 tab 自動清除
 - **CVV 複製後**：60 秒後自動清除剪貼簿（`navigator.clipboard.writeText('')`）
 - **卡號遮蔽**：預設顯示後四碼；業務點擊「確認看全號」→ 顯示完整卡號 → 業務人工核對後按「確認無誤」→ 才能觸發 `confirm()`；這是阻斷確認步驟，不可跳過
-- **Session token**：儲存在 memory，不寫 localStorage；重整後需重新登入
+- **Session token**：儲存在 sessionStorage，重整保留、關分頁清除（折衷選擇，介於 memory 與 localStorage 之間）
 
 ## Acceptance Criteria
 

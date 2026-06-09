@@ -107,11 +107,11 @@ document.querySelectorAll('.field').forEach(field => {
 // ===== 發送連結 + 產 QR Code =====
 document.getElementById('btn-issue').addEventListener('click', async () => {
   try {
-    let operatorId = localStorage.getItem('operator_id')
+    let operatorId = sessionStorage.getItem('operator_id')
     if (!operatorId) {
       operatorId = prompt('請輸入業務 ID：')
       if (!operatorId) return
-      localStorage.setItem('operator_id', operatorId)
+      sessionStorage.setItem('operator_id', operatorId)
     }
 
     const res = await fetch('/api/token/issue', {
@@ -167,7 +167,7 @@ document.getElementById('btn-cancel-waiting').addEventListener('click', () => {
 // 確認看全號（進入 confirming 阻斷狀態）
 document.getElementById('btn-show-full-card').addEventListener('click', async () => {
   try {
-    const operatorId = localStorage.getItem('operator_id')
+    const operatorId = sessionStorage.getItem('operator_id')
     const res = await fetch(`/api/token/${currentToken.id}/card`, {
       headers: { 'Authorization': `Bearer ${operatorId}` }
     })
@@ -184,7 +184,7 @@ document.getElementById('btn-show-full-card').addEventListener('click', async ()
 // 人工確認無誤
 document.getElementById('btn-confirm-ok').addEventListener('click', async () => {
   try {
-    const operatorId = localStorage.getItem('operator_id')
+    const operatorId = sessionStorage.getItem('operator_id')
     await fetch(`/api/token/${currentToken.id}/confirm`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${operatorId}` }
@@ -206,7 +206,7 @@ document.getElementById('btn-confirm-back').addEventListener('click', () => {
 // 結案
 async function doDestroy() {
   try {
-    const operatorId = localStorage.getItem('operator_id')
+    const operatorId = sessionStorage.getItem('operator_id')
     await fetch(`/api/token/${currentToken?.id}/destroy`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${operatorId}` }
@@ -227,7 +227,7 @@ async function loadHistory() {
   const listEl = document.getElementById('history-list')
   listEl.innerHTML = '<p class="loading-text">載入中...</p>'
 
-  const operatorId = localStorage.getItem('operator_id')
+  const operatorId = sessionStorage.getItem('operator_id')
   if (!operatorId) {
     listEl.innerHTML = '<p class="loading-text">請先在「目前客戶」頁登入業務 ID。</p>'
     return

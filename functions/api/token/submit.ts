@@ -1,5 +1,6 @@
 import { generateId } from '../../utils/id'
 import { encrypt } from '../../utils/crypto'
+import { SubmissionSchema } from '../../../contracts/submission.schema'
 
 interface Env {
   DB: D1Database
@@ -11,6 +12,7 @@ export async function handleSubmit(request: Request, env: Env, tokenId: string):
   const token = await env.DB.prepare(`SELECT * FROM tokens WHERE id = ?`).bind(tokenId).first()
   if (!token) return new Response('Not Found', { status: 404 })
   if (token.status === 'expired' || token.status === 'destroyed') return new Response('Gone', { status: 410 })
+  if (token.status === 'issued') return new Response('not opened', { status: 409 })
   if (token.status === 'uploaded' || token.status === 'confirmed') return new Response('Conflict', { status: 409 })
 
   const formData = await request.formData()
@@ -18,31 +20,43 @@ export async function handleSubmit(request: Request, env: Env, tokenId: string):
   const photo = formData.get('photo') as File | null
 
   if (!submissionJson) return new Response('Bad Request', { status: 400 })
+  if (!photo) return new Response('photo required', { status: 400 })
 
-  let submission: any
+  let parsed: unknown
   try {
-    submission = JSON.parse(submissionJson)
+    parsed = JSON.parse(submissionJson)
   } catch {
-    return new Response('Bad Request', { status: 400 })
+    return new Response('invalid JSON', { status: 400 })
   }
+  const result = SubmissionSchema.safeParse(parsed)
+  if (!result.success) {
+    console.error('[submit] zod failed:', result.error.flatten())
+    return new Response('invalid submission', { status: 400 })
+  }
+  const submission = result.data
 
   // 驗證 photo hash
-  if (photo) {
-    const buf = await photo.arrayBuffer()
-    const hashBuf = await crypto.subtle.digest('SHA-256', buf)
-    const hash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('')
-    if (hash !== submission.photo_hash) {
-      return new Response('Watermark verification failed', { status: 400 })
-    }
+  const buf = await photo.arrayBuffer()
+  const hashBuf = await crypto.subtle.digest('SHA-256', buf)
+  const hash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('')
+  if (hash !== submission.photo_hash) {
+    return new Response('Watermark verification failed', { status: 400 })
   }
 
   // 加密敏感欄位
-  const cardNumEnc = submission.ocr_card?.card_number
-    ? await encrypt(submission.ocr_card.card_number, env.ENCRYPTION_KEY)
-    : null
-  const idNumEnc = submission.ocr_id?.id_number
-    ? await encrypt(submission.ocr_id.id_number, env.ENCRYPTION_KEY)
-    : null
+  let cardNumEnc: string | null
+  let idNumEnc: string | null
+  try {
+    cardNumEnc = submission.ocr_card?.card_number
+      ? await encrypt(submission.ocr_card.card_number, env.ENCRYPTION_KEY)
+      : null
+    idNumEnc = submission.ocr_id?.id_number
+      ? await encrypt(submission.ocr_id.id_number, env.ENCRYPTION_KEY)
+      : null
+  } catch (err: any) {
+    console.error('[submit] crypto_failed:', err?.message)
+    return new Response('crypto failed', { status: 500 })
+  }
 
   const submissionId = generateId()
   const now = new Date().toISOString()

@@ -1,10 +1,17 @@
-interface Env { SESSION_ROOM: DurableObjectNamespace }
+interface Env { DB: D1Database; SESSION_ROOM: DurableObjectNamespace }
 
 export async function handleCvv(request: Request, env: Env, tokenId: string): Promise<Response> {
   const body = await request.json() as { token_id: string; cvv: string }
 
   if (!body.cvv || !/^\d{3,4}$/.test(body.cvv)) {
     return new Response('Invalid CVV', { status: 400 })
+  }
+
+  const token = await env.DB.prepare('SELECT status FROM tokens WHERE id = ?')
+    .bind(tokenId).first()
+  if (!token) return new Response('not found', { status: 404 })
+  if (token['status'] !== 'uploaded') {
+    return new Response(`wrong status: ${token['status']}`, { status: 409 })
   }
 
   // CVV 直接轉發，不碰 DB

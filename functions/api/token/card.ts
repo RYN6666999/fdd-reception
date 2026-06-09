@@ -20,6 +20,12 @@ export async function handleGetCard(request: Request, env: Env, tokenId: string)
 
   if (!sub?.card_number_enc) return new Response('Not Found', { status: 404 })
 
-  const cardNumber = await decrypt(sub.card_number_enc as string, env.ENCRYPTION_KEY)
+  let cardNumber: string
+  try {
+    cardNumber = await decrypt(sub.card_number_enc as string, env.ENCRYPTION_KEY)
+  } catch (err: any) {
+    console.error('[card] crypto_failed:', err?.message)
+    return new Response('crypto failed', { status: 500 })
+  }
   return Response.json({ card_number: cardNumber })
 }
