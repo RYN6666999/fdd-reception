@@ -1,0 +1,94 @@
+body {
+  font-family: system-ui;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* Login */
+#view-login form {
+  max-width: 360px;
+  margin: 80px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#view-login input,
+#view-login button {
+  padding: 8px 12px;
+  font-size: 1rem;
+}
+
+#login-error {
+  max-width: 360px;
+  margin: 0 auto;
+  color: red;
+  font-size: 0.9rem;
+}
+
+/* Header */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+header h1 {
+  margin: 0;
+}
+
+/* Filter bar */
+#filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+#filter-bar input,
+#filter-bar button {
+  padding: 6px 10px;
+  font-size: 0.95rem;
+}
+
+/* Table */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+thead {
+  border-bottom: 2px solid black;
+}
+
+th {
+  text-align: left;
+  padding: 8px;
+}
+
+td {
+  padding: 8px;
+}
+
+tr:hover {
+  background: #f5f5f5;
+}
+
+/* Pagination */
+#pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

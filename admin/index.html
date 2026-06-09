@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理後台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="view-login">
+    <form id="form-login">
+      <input type="text" name="admin_id" placeholder="管理員 ID" required>
+      <input type="password" name="password" placeholder="密碼" required>
+      <button type="submit">登入</button>
+    </form>
+    <div id="login-error" hidden></div>
+  </div>
+
+  <div id="view-main" hidden>
+    <header>
+      <h1>Timeline</h1>
+      <button id="btn-logout">登出</button>
+    </header>
+
+    <div id="filter-bar">
+      <input type="date" id="filter-from" title="開始日期">
+      <input type="date" id="filter-to" title="結束日期">
+      <input type="text" id="filter-operator" placeholder="業務 ID">
+      <button id="btn-search">查詢</button>
+    </div>
+
+    <div id="timeline-container">
+      <div id="timeline-empty" hidden>此區間無記錄。</div>
+      <table id="timeline-table" hidden>
+        <thead>
+          <tr>
+            <th>時間</th>
+            <th>事件</th>
+            <th>業務 ID</th>
+            <th>Token ID</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="timeline-body"></tbody>
+      </table>
+      <div id="pagination">
+        <button id="btn-prev" disabled>上一頁</button>
+        <span id="page-info"></span>
+        <button id="btn-next" disabled>下一頁</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

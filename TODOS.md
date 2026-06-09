@@ -21,67 +21,67 @@
 
 ---
 
-## Phase 1 — Contracts Baseline 🔲
+## Phase 1 — Contracts Baseline ✅
 
 > 守門：`npm run guard:contracts` 必須 PASSED 才能進 Phase 2
 
 ### 1a. Token Schema
-- [ ] `contracts/token.schema.ts`
+- [x] `contracts/token.schema.ts`
   - 狀態枚舉：`issued | opened | uploaded | confirmed | expired | destroyed`
   - 欄位：`id, operator_id, created_at, opened_at, expires_at, status, short_url`
   - Zod refinement：`expires_at > opened_at`
-- [ ] `contracts/token.schema.test.ts`
+- [x] `contracts/token.schema.test.ts`
   - happy path：valid token
   - 邊界：expires_at = opened_at → 應拒絕
   - 拒絕：無效 status 字串
 
 ### 1b. OCR Card Schema
-- [ ] `contracts/ocr-card.schema.ts`
+- [x] `contracts/ocr-card.schema.ts`
   - 欄位：`card_number (16碼), expiry (MM/YY), holder_name (optional)`
   - Zod refinement：Luhn 校驗（卡號）
   - Zod refinement：到期日合理性（expiry 未過期）
-- [ ] `contracts/ocr-card.schema.test.ts`
+- [x] `contracts/ocr-card.schema.test.ts`
   - happy：`4111 1111 1111 1111`（Luhn valid Visa test card）
   - 拒絕：Luhn invalid
   - 拒絕：已過期的到期日
   - 邊界：`holder_name` 缺席 → 應通過
 
 ### 1c. OCR ID Schema
-- [ ] `contracts/ocr-id.schema.ts`
+- [x] `contracts/ocr-id.schema.ts`
   - 欄位：`name, id_number, birth_date`
   - Zod refinement：台灣身分證字號校驗演算法（A1234567890 格式 + 加權校驗）
-- [ ] `contracts/ocr-id.schema.test.ts`
+- [x] `contracts/ocr-id.schema.test.ts`
   - happy：合法身分證號
   - 拒絕：格式不符
   - 拒絕：校驗碼錯誤
 
 ### 1d. Submission Schema
-- [ ] `contracts/submission.schema.ts`
+- [x] `contracts/submission.schema.ts`
   - 欄位：`token_id, ocr_card, ocr_id, installment (optional), photo_hash`
   - **CVV 不在此 schema**（CVV 走獨立 WebSocket 推送，不寫 DB）
-- [ ] `contracts/submission.schema.test.ts`
+- [x] `contracts/submission.schema.test.ts`
   - happy：完整送出
   - 拒絕：token_id 缺席
   - 拒絕：photo_hash 格式不符（非 SHA-256）
 
 ### 1e. Timeline Event Schema
-- [ ] `contracts/timeline-event.schema.ts`
+- [x] `contracts/timeline-event.schema.ts`
   - 欄位：`id, event_type, token_id, operator_id, timestamp, metadata (optional)`
   - event_type 枚舉：`token_issued | token_opened | token_submitted | token_confirmed | token_expired | token_destroyed | photo_downloaded`
-- [ ] `contracts/timeline-event.schema.test.ts`
+- [x] `contracts/timeline-event.schema.test.ts`
 
 ### 1f. Guard 更新
-- [ ] 更新 `guards/check-contracts.mjs` — 加入存在性 + tsc 型別檢查
-- [ ] `npm run guard:contracts` PASSED
+- [x] 更新 `guards/check-contracts.mjs` — 加入存在性 + tsc 型別檢查
+- [x] `npm run guard:contracts` PASSED
 
 ---
 
-## Phase 2 — 後端 Token Pipeline 🔲
+## Phase 2 — 後端 Token Pipeline ✅
 
 > 守門：`npm run guard:all` 在本 phase 完成前必須針對 server/ 通過
 
 ### 2a. D1 Schema
-- [ ] `server/schema.sql`
+- [x] `server/schema.sql`
   - `tokens` table（含所有 Token 欄位）
   - `submissions` table（敏感欄位加密儲存）
   - `timeline_events` table
@@ -89,68 +89,68 @@
   - Index：`tokens(operator_id, status)`, `timeline_events(token_id)`, `timeline_events(operator_id, timestamp)`
 
 ### 2b. Token API
-- [ ] `server/api/token/issue.ts` — POST `/api/token/issue`
+- [x] `server/api/token/issue.ts` — POST `/api/token/issue`
   - 驗證 operator session
   - 產生短網址（nanoid 8 碼）
   - Rate limit：每 operator 每小時 100 次（D1 counter）
   - 寫入 `timeline_events`：`token_issued`
-- [ ] `server/api/token/open.ts` — POST `/api/token/:id/open`
+- [x] `server/api/token/open.ts` — POST `/api/token/:id/open`
   - `issued` → `opened`，記錄 `opened_at`
   - 設定 10 分鐘 TTL
   - 寫入 `timeline_events`：`token_opened`
-- [ ] `server/api/token/submit.ts` — POST `/api/token/:id/submit`
+- [x] `server/api/token/submit.ts` — POST `/api/token/:id/submit`
   - 驗證 `Submission` schema（Zod safeParse）
   - 驗證 `photo_hash` 與 Token 綁定的 hash 匹配
   - AES-256-GCM 加密卡號 + 身分證字號
   - `uploaded` 後狀態不可再 submit → 409
   - 透過 Durable Object 推送 `uploaded` 事件給業務端
   - 寫入 `timeline_events`：`token_submitted`
-- [ ] `server/api/token/confirm.ts` — POST `/api/token/:id/confirm`
+- [x] `server/api/token/confirm.ts` — POST `/api/token/:id/confirm`
   - `uploaded` → `confirmed`
   - 寫入 `timeline_events`：`token_confirmed`
-- [ ] `server/api/token/destroy.ts` — DELETE `/api/token/:id/destroy`
+- [x] `server/api/token/destroy.ts` — DELETE `/api/token/:id/destroy`
   - 任何狀態 → `destroyed`
   - 刪除 `submissions` 表的敏感欄位（卡號、身分證加密值置 NULL）
   - 寫入 `timeline_events`：`token_destroyed`
 
 ### 2c. Token 過期排程
-- [ ] `server/cron/expire-tokens.ts` — Cron Trigger（每分鐘）
+- [x] `server/cron/expire-tokens.ts` — Cron Trigger（每分鐘）
   - 查詢 `opened` 且 `expires_at < now()` 的 Token
   - 批次更新 → `expired`
   - 透過 Durable Object 推送 `expired` 事件
   - 寫入 `timeline_events`：`token_expired`
 
 ### 2d. Durable Object — SessionRoom
-- [ ] `server/durable-objects/session-room.ts`
+- [x] `server/durable-objects/session-room.ts`
   - 狀態持有：當前 Token 的最新快照
   - WS 連線管理（業務端多個裝置可連同一房間）
   - 推送事件：`uploaded | expired | destroyed | confirmed`
   - 重連時推送快照（`type: 'snapshot'`）
 
 ### 2e. CVV 推送（獨立不寫 DB）
-- [ ] 在 `submit.ts` 收到 CVV 後，立即透過 Durable Object 推送給業務端 WS
-- [ ] CVV 不進任何 log、不進 D1
+- [x] 在 `submit.ts` 收到 CVV 後，立即透過 Durable Object 推送給業務端 WS
+- [x] CVV 不進任何 log、不進 D1
 
 ---
 
-## Phase 3 — 客戶端拍照 + OCR 🔲
+## Phase 3 — 客戶端拍照 + OCR ✅
 
 ### 3a. 核心 UI 骨架
-- [ ] `client/index.html` — 最小 HTML shell（無歡迎詞、無引導文案）
-- [ ] `client/app.js` — State machine（`loading | invalid | capture | confirm | done | error`）
+- [x] `client/index.html` — 最小 HTML shell（無歡迎詞、無引導文案）
+- [x] `client/app.js` — State machine（`loading | invalid | capture | confirm | done | error`）
   - 使用原生 JS class + dispatchEvent，不用框架
   - 每個 state 對應一個 view function，禁止直接 DOM 操作在 state 外部
-- [ ] `client/style.css` — 極簡，無顏色情緒設計
+- [x] `client/style.css` — 極簡，無顏色情緒設計
 
 ### 3b. 拍照 + Camera API
-- [ ] `client/camera.js`
+- [x] `client/camera.js`
   - `getUserMedia({ video: { facingMode: 'environment' } })`
   - File input fallback（不支援 camera 的環境）
   - 拍照後回傳 `Blob`
   - 解析度限制：最大 2048px 邊長（壓縮過大圖片）
 
 ### 3c. 浮水印
-- [ ] `client/watermark.js`
+- [x] `client/watermark.js`
   - Canvas API 套用浮水印：`限業務使用 · {YYYY-MM-DD HH:mm} · {token_id 後六碼}`
   - 字體：白字 + 黑色描邊（在任何背景可讀）
   - 位置：圖片中央斜向 45°（防截圖去除）
@@ -158,7 +158,7 @@
   - 浮水印強制套用，無法繞過（hash 與 token 綁定，伺服器端驗證）
 
 ### 3d. OCR — 信用卡正面
-- [ ] `client/ocr-card.js`
+- [x] `client/ocr-card.js`
   - Tesseract.js worker（`createWorker('eng')`）
   - 預處理：灰階 + 對比增強（提高 OCR 準確率）
   - 擷取邏輯：
@@ -169,7 +169,7 @@
   - 驗證失敗 → 回傳空欄位（允許手動輸入，不阻斷）
 
 ### 3e. OCR — 身分證
-- [ ] `client/ocr-id.js`
+- [x] `client/ocr-id.js`
   - 擷取邏輯：
     - 姓名（中文）
     - 身分證字號（`[A-Z]\d{9}` 格式）
@@ -177,16 +177,16 @@
   - 結果用 `OcrIdSchema.safeParse()` 驗證
 
 ### 3f. Phase 3b（選做，正面辨識失敗時才觸發）
-- [ ] `client/ocr-card-back.js` — 背面 CVV 辨識
+- [x] `client/ocr-card-back.js` — 背面 CVV 辨識
   - 只在 OCR 正面卡號辨識失敗後，顯示「請翻到背面重拍」提示
   - 辨識失敗仍允許手動輸入，不阻斷
 
 ---
 
-## Phase 4 — 客戶端確認 + 上傳 🔲
+## Phase 4 — 客戶端確認 + 上傳 ✅
 
 ### 4a. 確認畫面
-- [ ] `client/views/confirm.js`
+- [x] `client/views/confirm.js`
   - 顯示 OCR 結果（可編輯）
   - 卡號欄位：顯示 16 碼（可編輯），Luhn 即時校驗
   - 到期日欄位：MM/YY，到期日校驗
@@ -196,7 +196,7 @@
   - 送出按鈕：所有必填欄位通過校驗才 enable
 
 ### 4b. 上傳 API 呼叫
-- [ ] `client/api.js`
+- [x] `client/api.js`
   - `submitData(tokenId, submission, cvv)`
     - 先 POST `submission`（不含 CVV）→ `/api/token/:id/submit`
     - 成功後透過 WS 推送 CVV（不含在 HTTP body）
@@ -204,29 +204,29 @@
   - CVV 送出後立即清除變數（`cvv = null`）
 
 ### 4c. 完成畫面
-- [ ] `client/views/done.js`
+- [x] `client/views/done.js`
   - 靜態文字：「資料已送出」
   - 無任何下一步按鈕
   - 無倒數、無情感設計
 
 ---
 
-## Phase 5 — 業務端懸浮資料卡 🔲
+## Phase 5 — 業務端懸浮資料卡 ✅
 
 ### 5a. 核心 UI
-- [ ] `operator/index.html`
-- [ ] `operator/app.js` — State machine（`idle | waiting | reviewing | confirming | done | error`）
+- [x] `operator/index.html`
+- [x] `operator/app.js` — State machine（`idle | waiting | reviewing | confirming | done | error`）
   - **`confirming` 是阻斷狀態**：展開全卡號後必須人工按「確認無誤」才能 `confirm()`
 
 ### 5b. Token 發送流程
-- [ ] `operator/views/idle.js`
+- [x] `operator/views/idle.js`
   - 「發送收件連結」按鈕
   - 呼叫 `POST /api/token/issue` → 取得短網址
   - 複製短網址到剪貼簿 + 顯示「已複製」1 秒
   - 進入 `waiting` 狀態
 
 ### 5c. WebSocket 即時接收
-- [ ] `operator/ws.js`
+- [x] `operator/ws.js`
   - 連線 `/api/session/:tokenId/ws`
   - 事件處理：`uploaded | expired | destroyed | confirmed | snapshot`
   - 斷線自動重連（指數退避 1s → 2s → 4s → 8s → 16s，最多 5 次）
@@ -234,7 +234,7 @@
   - 斷線期間顯示「連線中斷，重新連線...」badge
 
 ### 5d. 資料卡 + 複製
-- [ ] `operator/views/reviewing.js`
+- [x] `operator/views/reviewing.js`
   - 欄位分組：
     - **Step 1 — 持卡人**：姓名、身分證字號、生日
     - **Step 2 — 卡片資訊**：卡號（後四碼）、到期日、分期
@@ -243,7 +243,7 @@
   - Clipboard API 失敗 → `window.prompt` fallback
 
 ### 5e. 人工確認全卡號（阻斷步驟）
-- [ ] `operator/views/confirming.js`
+- [x] `operator/views/confirming.js`
   - 進入條件：業務點擊「確認看全號」
   - 顯示完整 16 碼卡號（解密 API 呼叫）
   - 顯示「請核對卡號無誤後按確認」
@@ -251,59 +251,59 @@
   - **不可跳過此步驟直接 confirm**
 
 ### 5f. CVV 接收與自動清除
-- [ ] CVV 透過 WS 推送，顯示後：
+- [x] CVV 透過 WS 推送，顯示後：
   - 離開頁面 / 切換 tab → 自動清除 CVV DOM
   - 複製 CVV 後 60 秒：`navigator.clipboard.writeText('')`
   - 進入 `confirming` 或 `done` 狀態後清除 CVV
 
 ### 5g. 結案
-- [ ] `operator/views/done.js`
+- [x] `operator/views/done.js`
   - 「結案」按鈕 → DELETE `/api/token/:id/destroy`
   - 結案後清空所有客戶資料 DOM
   - 回到 `idle` 狀態
 
 ---
 
-## Phase 6 — 敏感資料保護 🔲
+## Phase 6 — 敏感資料保護 ✅
 
 ### 6a. 加密儲存
-- [ ] `server/utils/crypto.ts`
+- [x] `server/utils/crypto.ts`
   - AES-256-GCM 加密 / 解密
   - Key 從 `env.ENCRYPTION_KEY` 讀取（Cloudflare Workers Secret）
   - 輸出：`{ iv, ciphertext, tag }` 序列化為 base64 string
-- [ ] 確認 `server/api/token/submit.ts` 使用此模組加密卡號 + 身分證字號
-- [ ] 確認 `server/api/token/destroy.ts` 將加密欄位置 NULL
+- [x] 確認 `server/api/token/submit.ts` 使用此模組加密卡號 + 身分證字號
+- [x] 確認 `server/api/token/destroy.ts` 將加密欄位置 NULL
 
 ### 6b. 30 天自動刪除
-- [ ] `server/cron/cleanup-sensitive.ts` — Cron Trigger（每天一次）
+- [x] `server/cron/cleanup-sensitive.ts` — Cron Trigger（每天一次）
   - 查詢 `confirmed_at < now() - 30 days` 的 `submissions`
   - 將 `card_number_enc, id_number_enc` 欄位置 NULL
   - 寫入 `timeline_events`：`data_auto_deleted`
 
 ### 6c. Photo Hash 伺服器端驗證
-- [ ] 在 `server/api/token/submit.ts` 驗證：
+- [x] 在 `server/api/token/submit.ts` 驗證：
   - 計算收到照片的 SHA-256
   - 比對客戶端送來的 `photo_hash`
   - 不匹配 → 400 Bad Request（防止浮水印被繞過）
 
 ---
 
-## Phase 7 — 管理後台 Timeline 🔲
+## Phase 7 — 管理後台 Timeline ✅
 
 ### 7a. Timeline 查詢
-- [ ] `admin/index.html`
-- [ ] `admin/api.js` — GET `/api/admin/timeline`
+- [x] `admin/index.html`
+- [x] `admin/api.js` — GET `/api/admin/timeline`
   - 支援 `TimelineQuery`：日期範圍、operator_id filter
   - Pagination（每頁 50 筆）
 
 ### 7b. 照片下載
-- [ ] GET `/api/admin/photo/:tokenId`
+- [x] GET `/api/admin/photo/:tokenId`
   - 驗證 admin session
   - 寫入 `admin_access_log`：who, when, token_id
   - 回傳浮水印照片 Blob
 
 ### 7c. 手動刪除
-- [ ] DELETE `/api/admin/record/:tokenId`
+- [x] DELETE `/api/admin/record/:tokenId`
   - 刪除 `submissions` 敏感欄位
   - 保留 `timeline_events`（審計不可刪）
 
@@ -312,9 +312,9 @@
 ## Phase 8 — Guard Pipeline 完整化 🔲
 
 ### 8a. 更新 guard:contracts
-- [ ] 加入 tsc 型別檢查（`npx tsc --noEmit`）
-- [ ] 加入 test runner（`bun test contracts/`）
-- [ ] 確保所有 schema tests PASSED
+- [x] 加入 tsc 型別檢查（`npx tsc --noEmit`）
+- [x] 加入 test runner（`bun test contracts/`）
+- [x] 確保所有 schema tests PASSED
 
 ### 8b. guard:lint
 - [ ] 設定 ESLint（`eslint.config.mjs`）

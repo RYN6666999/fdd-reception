@@ -13,3 +13,6 @@ class_name = "SessionRoom"
 [[migrations]]
 tag = "v1"
 new_classes = ["SessionRoom"]
+
+[triggers]
+crons = ["* * * * *", "0 2 * * *"]

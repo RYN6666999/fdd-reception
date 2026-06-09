@@ -1,0 +1,68 @@
+body {
+  font-family: system-ui;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+  background: #fff;
+  color: #000;
+}
+
+video {
+  width: 100%;
+  display: block;
+  margin-bottom: 8px;
+}
+
+button {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+  border-radius: 0;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+button:active {
+  background: #eee;
+}
+
+label#btn-upload {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 8px;
+  border: 1px solid #000;
+  font-size: 1rem;
+  cursor: pointer;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+input {
+  width: 100%;
+  padding: 8px;
+  font-size: 1rem;
+  border: 1px solid #000;
+  border-radius: 0;
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+}
+
+input:invalid {
+  outline: 2px solid #000;
+}
+
+input[type="date"] {
+  font-family: system-ui;
+}

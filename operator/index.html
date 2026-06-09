@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>業務收件</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="ws-status" hidden>連線中斷，重新連線中...</div>
+
+  <div id="view-idle">
+    <button id="btn-issue">發送收件連結</button>
+  </div>
+
+  <div id="view-waiting" hidden>
+    <p>等待客戶填寫中...</p>
+    <div id="short-url-display"></div>
+    <button id="btn-copy-url">複製連結</button>
+    <button id="btn-cancel-waiting">取消</button>
+  </div>
+
+  <div id="view-reviewing" hidden>
+    <section data-step="1">
+      <h3>持卡人</h3>
+      <div class="field" data-field="name"><span class="label">姓名</span><span class="value"></span></div>
+      <div class="field" data-field="id_number"><span class="label">身分證</span><span class="value"></span></div>
+      <div class="field" data-field="birth_date"><span class="label">生日</span><span class="value"></span></div>
+    </section>
+    <section data-step="2">
+      <h3>卡片資訊</h3>
+      <div class="field" data-field="card_last4"><span class="label">卡號末四碼</span><span class="value"></span></div>
+      <div class="field" data-field="expiry"><span class="label">有效期限</span><span class="value"></span></div>
+      <div class="field" data-field="cvv"><span class="label">CVV</span><span class="value">••••</span></div>
+      <div class="field" data-field="installment"><span class="label">分期</span><span class="value"></span></div>
+    </section>
+    <section data-step="3">
+      <button id="btn-show-full-card">確認看全號</button>
+    </section>
+    <button id="btn-destroy-reviewing">結案</button>
+  </div>
+
+  <div id="view-confirming" hidden>
+    <p>完整卡號（請核對）：</p>
+    <div id="full-card-number" class="card-number-display"></div>
+    <p>請確認卡號無誤後按下確認。</p>
+    <button id="btn-confirm-ok">確認無誤</button>
+    <button id="btn-confirm-back">資料有誤</button>
+  </div>
+
+  <div id="view-done" hidden>
+    <p>已確認。</p>
+    <button id="btn-done-close">結案</button>
+  </div>
+
+  <div id="view-error" hidden></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

