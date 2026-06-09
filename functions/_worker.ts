@@ -13,6 +13,7 @@ interface Env {
   BASE_URL: string
   ENCRYPTION_KEY: string
   SESSION_ROOM: DurableObjectNamespace
+  ASSETS: { fetch: (req: Request) => Promise<Response> }
 }
 
 export { SessionRoom } from './durable-objects/session-room'
@@ -47,7 +48,8 @@ export default {
       return room.fetch(request)
     }
 
-    return new Response('Not Found', { status: 404 })
+    // Pass-through 給靜態資產（client/, operator/, admin/, /c/ 等）
+    return env.ASSETS.fetch(request)
   },
 
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
