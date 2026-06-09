@@ -138,22 +138,25 @@ function setupNextButton(btnId, validator, onNext) {
 // --- Init ---
 async function init() {
   if (!tokenId) {
-    document.getElementById('view-invalid').textContent = '錯誤：缺少 token 參數（URL=' + location.href + '）'
+    alert('DEBUG: 缺少token\nURL=' + location.href)
     showView('view-invalid')
     return
   }
 
+  let openRes
   try {
-    const res = await fetch(`/api/token/${tokenId}/open`, { method: 'POST' })
-    if (!res.ok) {
-      const body = await res.text().catch(() => '')
-      document.getElementById('view-invalid').textContent = `連結失效（HTTP ${res.status}：${body || '無說明'}）`
-      showView('view-invalid')
-      return
-    }
+    openRes = await fetch(`/api/token/${tokenId}/open`, { method: 'POST' })
   } catch (err) {
+    alert('DEBUG: fetch失敗\n' + (err?.message ?? err))
     showView('view-error')
     document.getElementById('view-error').textContent = '網路錯誤：' + (err?.message ?? err)
+    return
+  }
+
+  if (!openRes.ok) {
+    const body = await openRes.text().catch(() => '')
+    alert(`DEBUG: open失敗\nHTTP ${openRes.status}\n${body}`)
+    showView('view-invalid')
     return
   }
 
