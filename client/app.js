@@ -137,14 +137,23 @@ function setupNextButton(btnId, validator, onNext) {
 
 // --- Init ---
 async function init() {
-  if (!tokenId) { showView('view-invalid'); return }
+  if (!tokenId) {
+    document.getElementById('view-invalid').textContent = '錯誤：缺少 token 參數（URL=' + location.href + '）'
+    showView('view-invalid')
+    return
+  }
 
   try {
     const res = await fetch(`/api/token/${tokenId}/open`, { method: 'POST' })
-    if (!res.ok) { showView('view-invalid'); return }
-  } catch {
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      document.getElementById('view-invalid').textContent = `連結失效（HTTP ${res.status}：${body || '無說明'}）`
+      showView('view-invalid')
+      return
+    }
+  } catch (err) {
     showView('view-error')
-    document.getElementById('view-error').textContent = '網路錯誤，請稍後再試。'
+    document.getElementById('view-error').textContent = '網路錯誤：' + (err?.message ?? err)
     return
   }
 
