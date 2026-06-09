@@ -138,26 +138,21 @@ function setupNextButton(btnId, validator, onNext) {
 // --- Init ---
 async function init() {
   if (!tokenId) {
-    alert('DEBUG: 缺少token\nURL=' + location.href)
     showView('view-invalid')
     return
   }
 
-  let openRes
+  // /open 只是狀態追蹤，非同步 fire-and-forget
+  // 失敗不擋住客戶填表（只有真正 expired/destroyed 才顯示失效）
   try {
-    openRes = await fetch(`/api/token/${tokenId}/open`, { method: 'POST' })
-  } catch (err) {
-    alert('DEBUG: fetch失敗\n' + (err?.message ?? err))
-    showView('view-error')
-    document.getElementById('view-error').textContent = '網路錯誤：' + (err?.message ?? err)
-    return
-  }
-
-  if (!openRes.ok) {
-    const body = await openRes.text().catch(() => '')
-    alert(`DEBUG: open失敗\nHTTP ${openRes.status}\n${body}`)
-    showView('view-invalid')
-    return
+    const res = await fetch(`/api/token/${tokenId}/open`, { method: 'POST' })
+    if (res.status === 410) {
+      // 410 = expired 或 destroyed，才真正拒絕
+      showView('view-invalid')
+      return
+    }
+  } catch {
+    // 網路問題也讓客戶繼續，submit 時再擋
   }
 
   showView('wizard')
