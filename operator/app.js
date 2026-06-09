@@ -117,15 +117,16 @@ document.getElementById('btn-issue').addEventListener('click', async () => {
     const token = await res.json()
     currentToken = token
 
-    document.getElementById('short-url-display').textContent = token.short_url
+    // 直接用完整 client URL，不走 /c/ redirect（避免 Android Chrome Custom Tab 的 redirect 問題）
+    const clientUrl = `${location.origin}/client/?token=${token.id}`
+    document.getElementById('short-url-display').textContent = clientUrl
 
     // QR Code
     clearQrCode()
     const container = document.getElementById('qrcode-container')
-    // QRCode 是全域變數（從 CDN script 載入）
     if (typeof QRCode !== 'undefined') {
       qrInstance = new QRCode(container, {
-        text: token.short_url,
+        text: clientUrl,
         width: 200,
         height: 200,
         colorDark: '#1a1a1a',
@@ -133,7 +134,7 @@ document.getElementById('btn-issue').addEventListener('click', async () => {
         correctLevel: QRCode.CorrectLevel.M,
       })
     } else {
-      container.textContent = token.short_url
+      container.textContent = clientUrl
     }
 
     app.transition('waiting', { token })
@@ -144,7 +145,7 @@ document.getElementById('btn-issue').addEventListener('click', async () => {
 })
 
 document.getElementById('btn-copy-url').addEventListener('click', async () => {
-  const url = currentToken?.short_url
+  const url = currentToken ? `${location.origin}/client/?token=${currentToken.id}` : null
   if (url) {
     await copyToClipboard(url)
     showCopiedFeedback(document.getElementById('btn-copy-url'))
