@@ -24,9 +24,9 @@
 ```
 業務端畫面狀態：
 
-idle ──發送連結──▶ waiting ──收到 uploaded──▶ reviewing ──confirm──▶ done
-  ▲                  │                                                   │
-  └──────────────────┴──────────destroy()──────────────────────────────▶ idle
+idle ──發送連結──▶ waiting ──收到 uploaded──▶ reviewing ──展開全卡號──▶ confirming ──人工按「確認無誤」──▶ done
+  ▲                  │                            │                                                              │
+  └──────────────────┴────────────────────────────┴──────────destroy()──────────────────────────────────────────▶ idle
 ```
 
 - `idle`：無進行中的 Token
@@ -44,7 +44,7 @@ idle ──發送連結──▶ waiting ──收到 uploaded──▶ reviewin
 
 - **CVV 顯示**：只在 `reviewing` 狀態顯示，離開頁面或切換 tab 自動清除
 - **CVV 複製後**：60 秒後自動清除剪貼簿（`navigator.clipboard.writeText('')`）
-- **卡號遮蔽**：預設顯示後四碼，點擊「顯示全部」才展開（需要 operator PIN 再確認）[需 Ryan 確認]
+- **卡號遮蔽**：預設顯示後四碼；業務點擊「確認看全號」→ 顯示完整卡號 → 業務人工核對後按「確認無誤」→ 才能觸發 `confirm()`；這是阻斷確認步驟，不可跳過
 - **Session token**：儲存在 memory，不寫 localStorage；重整後需重新登入
 
 ## Acceptance Criteria
@@ -58,6 +58,6 @@ idle ──發送連結──▶ waiting ──收到 uploaded──▶ reviewin
 
 ## Out of Scope
 
-- 多個進行中 Token 同時顯示（[需 Ryan 確認] 業務是否會同時服務多名客戶？）
+- 多個進行中 Token 同時顯示（單 Token 先做，並行留 Out of Scope）
 - 業務端的歷史記錄查詢（在 admin 模組）
 - 行動裝置 App
