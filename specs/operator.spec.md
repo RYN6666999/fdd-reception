@@ -58,6 +58,6 @@ idle ──發送連結──▶ waiting ──收到 uploaded──▶ reviewin
 
 ## Out of Scope
 
-- 多個進行中 Token 同時顯示（單 Token 先做，並行留 Out of Scope）
+- 多個進行中 Token 同時顯示（設計決策：串行處理，一個客戶完成或結案後才接下一位，並行永遠不在 scope）
 - 業務端的歷史記錄查詢（在 admin 模組）
 - 行動裝置 App
