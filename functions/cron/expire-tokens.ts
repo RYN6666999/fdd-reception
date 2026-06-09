@@ -5,9 +5,9 @@ interface Env { DB: D1Database; SESSION_ROOM: DurableObjectNamespace }
 export async function handleExpireTokens(env: Env): Promise<void> {
   const now = new Date().toISOString()
 
-  // issued（未開啟）和 opened（已開啟）都納入過期處理
+  // issued tokens 的 expires_at 為 NULL（由 open.ts 設定），只處理 opened 狀態
   const expiring = await env.DB.prepare(
-    `SELECT id, operator_id FROM tokens WHERE status IN ('issued','opened') AND expires_at < ?`
+    `SELECT id, operator_id FROM tokens WHERE status = 'opened' AND expires_at < ?`
   ).bind(now).all()
 
   for (const token of expiring.results) {

