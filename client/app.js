@@ -39,7 +39,8 @@ function updateProgress(n) {
 }
 
 // --- Camera helpers ---
-async function setupCapture(stepNum, videoContainerId, btnCaptureId, fileInputId, fieldsId, btnNextId, processCallback) {
+// blobKey: 拍完後把 blob 存進 collectedData[blobKey]，確保 doSubmit 能取到真實照片
+async function setupCapture(stepNum, videoContainerId, btnCaptureId, fileInputId, fieldsId, btnNextId, processCallback, blobKey) {
   const container = document.getElementById(videoContainerId)
   const btnCapture = document.getElementById(btnCaptureId)
   const fileInput = document.getElementById(fileInputId)
@@ -60,7 +61,7 @@ async function setupCapture(stepNum, videoContainerId, btnCaptureId, fileInputId
   btnCapture.onclick = async () => {
     const canvas = captureFrame(video)
     stopCamera(cameraStream)
-    await processCapture(canvas, container, fieldsId, btnNextId, processCallback)
+    await processCapture(canvas, container, fieldsId, btnNextId, processCallback, blobKey)
   }
 
   fileInput.onchange = async (e) => {
@@ -68,17 +69,22 @@ async function setupCapture(stepNum, videoContainerId, btnCaptureId, fileInputId
     if (!file) return
     stopCamera(cameraStream)
     const canvas = await fileToCanvas(file)
-    await processCapture(canvas, container, fieldsId, btnNextId, processCallback)
+    await processCapture(canvas, container, fieldsId, btnNextId, processCallback, blobKey)
   }
 }
 
-async function processCapture(canvas, container, fieldsId, btnNextId, processCallback) {
+async function processCapture(canvas, container, fieldsId, btnNextId, processCallback, blobKey) {
   const preview = document.createElement('img')
   preview.style.cssText = 'width:100%;height:100%;object-fit:cover;'
   container.innerHTML = ''
 
   const { blob, hash } = await applyWatermark(canvas, tokenId)
   collectedData.photoHashes.push(hash)
+
+  // 把真實浮水印 blob 存入 collectedData，讓 doSubmit 能取到正確的照片做 hash 驗證
+  if (blobKey) {
+    collectedData[blobKey] = blob
+  }
 
   preview.src = URL.createObjectURL(blob)
   container.appendChild(preview)
@@ -159,19 +165,19 @@ async function init() {
   goToStep(0)
 
   // Setup step 0: 身分證正面
-  await setupCapture(0, 'capture-id-front', 'btn-capture-id-front', 'file-id-front', 'fields-id-front', 'btn-next-0', processIdFront)
+  await setupCapture(0, 'capture-id-front', 'btn-capture-id-front', 'file-id-front', 'fields-id-front', 'btn-next-0', processIdFront, 'idFrontBlob')
   setupNextButton('btn-next-0', null, () => goToStep(1))
 
   // Setup step 1: 身分證背面（拍完即可下一步，無 OCR fields）
-  await setupCapture(1, 'capture-id-back', 'btn-capture-id-back', 'file-id-back', null, 'btn-next-1', () => {})
+  await setupCapture(1, 'capture-id-back', 'btn-capture-id-back', 'file-id-back', null, 'btn-next-1', () => {}, 'idBackBlob')
   setupNextButton('btn-next-1', null, () => goToStep(2))
 
   // Setup step 2: 信用卡正面
-  await setupCapture(2, 'capture-card-front', 'btn-capture-card-front', 'file-card-front', 'fields-card-front', 'btn-next-2', processCardFront)
+  await setupCapture(2, 'capture-card-front', 'btn-capture-card-front', 'file-card-front', 'fields-card-front', 'btn-next-2', processCardFront, 'cardFrontBlob')
   setupNextButton('btn-next-2', null, () => goToStep(3))
 
   // Setup step 3: 信用卡背面 + CVV
-  await setupCapture(3, 'capture-card-back', 'btn-capture-card-back', 'file-card-back', null, 'btn-next-3', processCardBack)
+  await setupCapture(3, 'capture-card-back', 'btn-capture-card-back', 'file-card-back', null, 'btn-next-3', processCardBack, 'cardBackBlob')
   document.getElementById('card-cvv').addEventListener('input', (e) => {
     document.getElementById('btn-next-3').disabled = e.target.value.length < 3
   })
@@ -193,7 +199,7 @@ async function init() {
     } catch (err) {
       btn.disabled = false
       btn.textContent = '確認送出'
-      alert(err.message === 'ALREADY_SUBMITTED' ? '資料已送出，請勿重複操作。' : '送出失敗，請重試。')
+      alert(err.message === 'ALREADY_SUBMITTED' ? '資料已送出，請勿重複操作。' : err.message === 'PHOTO_MISSING' ? '請先完成所有拍照步驟後再送出。' : '送出失敗，請重試。')
     }
   }
 }
@@ -214,6 +220,11 @@ async function doSubmit() {
   const cvv = document.getElementById('card-cvv').value
   const photoHash = collectedData.photoHashes[0] ?? ''
 
+  // 防禦：photoHashes[0] 和 idFrontBlob 必須同時存在，否則 server 端 SHA-256 會不符
+  if (!collectedData.idFrontBlob || !photoHash) {
+    throw new Error('PHOTO_MISSING')
+  }
+
   await submitData(tokenId, {
     card_number: cardNum,
     expiry: document.getElementById('card-expiry').value,
@@ -223,7 +234,7 @@ async function doSubmit() {
     birth_date: document.getElementById('id-birth').value,
     installment: document.getElementById('card-installment').value || undefined,
     extra_photo_hashes: collectedData.photoHashes.slice(1),
-  }, collectedData.idFrontBlob || new Blob(), photoHash)
+  }, collectedData.idFrontBlob, photoHash)
 
   if (cvv) {
     await fetch(`/api/token/${tokenId}/cvv`, {

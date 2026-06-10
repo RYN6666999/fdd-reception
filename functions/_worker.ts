@@ -12,7 +12,6 @@ import { handleCleanupSensitive } from './cron/cleanup-sensitive'
 
 interface Env {
   DB: D1Database
-  BASE_URL: string
   ENCRYPTION_KEY: string
   SESSION_ROOM: DurableObjectNamespace
   ASSETS: { fetch: (req: Request) => Promise<Response> }
