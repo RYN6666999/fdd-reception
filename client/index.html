@@ -9,7 +9,7 @@
 <body>
 
 <!-- 失效/錯誤（在精靈外） -->
-<div id="view-invalid" hidden>此連結已失效，請聯繫業務人員。</div>
+<div id="view-invalid" hidden>此連結已失效或逾時，請聯繫業務人員重新發送。</div>
 <div id="view-error" hidden></div>
 <div id="view-loading" style="display:flex;align-items:center;justify-content:center;min-height:100dvh;">載入中...</div>
 
@@ -23,6 +23,8 @@
     <div class="progress-dot" data-step="3"></div>
     <div class="progress-dot" data-step="4"></div>
   </div>
+
+  <div id="ttl-banner" hidden style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:8px 20px;box-sizing:border-box;background:#1a1a1a;color:#fff;text-align:center;font-size:0.85rem;z-index:20;"></div>
 
   <div class="wizard-track" id="wizard-track" style="margin-top:28px;">
 

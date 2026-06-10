@@ -24,6 +24,8 @@ export async function submitData(tokenId, payload) {
   })
 
   if (res.status === 409) throw new Error('ALREADY_SUBMITTED')
+  if (res.status === 410) throw new Error('TOKEN_EXPIRED')
+  if (res.status === 400) throw new Error('VALIDATION_FAILED')
   if (!res.ok) throw new Error('SUBMIT_FAILED')
 
   return res.json()

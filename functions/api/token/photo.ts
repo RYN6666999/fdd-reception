@@ -10,10 +10,11 @@ const OCR_MODEL = '@cf/mistralai/mistral-small-3.1-24b-instruct'
 const OCR_MAX_ATTEMPTS = 2
 
 const OCR_PROMPTS: Record<PhotoType, string> = {
-  id_front: 'This is a Taiwanese national ID card (front). Extract: name (姓名, keep original Chinese characters), id_number (統一編號, format: 1 uppercase letter + 9 digits), birth_date (出生日期 shown as ROC calendar 民國N年; convert: Gregorian year = N + 1911; output format YYYY-MM-DD). Respond with ONLY this JSON object and nothing else: {"name":"...","id_number":"...","birth_date":"..."}',
+  id_front: 'This is a Taiwanese national ID card (front). Extract: name (姓名 — transcribe the Chinese characters EXACTLY as printed, stroke by stroke; Taiwanese names often use uncommon characters, do NOT substitute a similar-looking common character), id_number (統一編號, format: 1 uppercase letter + 9 digits), birth_date (出生日期 shown as ROC calendar 民國N年; convert: Gregorian year = N + 1911; output format YYYY-MM-DD). Respond with ONLY this JSON object and nothing else: {"name":"...","id_number":"...","birth_date":"..."}',
   id_back: 'This is the back of a Taiwanese national ID card. No data extraction needed. Respond with ONLY this JSON object and nothing else: {"ok":true}',
   card_front: 'This is a credit card front. Extract: card_number (the embossed 16-digit number), expiry (MM/YY), holder_name (uppercase latin letters). Respond with ONLY this JSON object and nothing else: {"card_number":"...","expiry":"...","holder_name":"..."}',
-  card_back: 'This is the back of a credit card. No data extraction needed. Respond with ONLY this JSON object and nothing else: {"ok":true}',
+  // 新式卡片卡號常印在背面，背面也嘗試辨識卡號/到期日（CVV 絕不辨識）
+  card_back: 'This is the back of a credit card. Many modern cards print the card number on the back. If a 15-16 digit card number and/or expiry date (MM/YY) are printed on this side, extract them; use null if not visible. Do NOT extract the 3-digit CVC/CVV security code. Respond with ONLY this JSON object and nothing else: {"card_number":null,"expiry":null}',
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -125,6 +126,21 @@ export async function handlePhotoUpload(request: Request, env: Env, tokenId: str
     if (!ocr.holder_name || (ocr.holder_name as string).trim().length < 2) {
       console.error('[endpoint:photo] ocr_validation_failed: holder_name too short')
       return Response.json({ ok: false, ocr_failed: true, field: 'holder_name', r2_key: r2Key })
+    }
+  }
+
+  // CVV 永不落地：就算模型違規回傳也在邊界剝除
+  for (const key of ['cvv', 'cvc', 'security_code']) delete ocr[key]
+
+  if (photoType === 'card_back') {
+    // 背面辨識是輔助性的：只保留通過檢核的值，沒讀到不算失敗
+    const digits = String(ocr.card_number ?? '').replace(/\D/g, '')
+    const validNumber = digits.length >= 13 && digits.length <= 19 && luhnCheck(digits)
+    const expiryStr = String(ocr.expiry ?? '')
+    const validExpiry = /^(0[1-9]|1[0-2])\/\d{2}$/.test(expiryStr)
+    ocr = {
+      ...(validNumber ? { card_number: digits } : {}),
+      ...(validExpiry ? { expiry: expiryStr } : {}),
     }
   }
 
