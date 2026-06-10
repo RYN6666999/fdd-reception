@@ -84,7 +84,12 @@ export async function handleSubmit(request: Request, env: Env, tokenId: string):
     body: JSON.stringify({
       type: 'uploaded',
       submission: {
-        ocr_card: { ...submission.ocr_card, card_number: undefined },
+        // 全卡號不進廣播（業務端走 /card 解密 API），只給末四碼供核對
+        ocr_card: {
+          ...submission.ocr_card,
+          card_number: undefined,
+          card_last4: submission.ocr_card?.card_number?.slice(-4),
+        },
         ocr_id: submission.ocr_id,
         installment: submission.installment,
       }

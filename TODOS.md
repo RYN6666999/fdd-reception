@@ -337,18 +337,21 @@
 
 ---
 
-## Phase 9 — 實戰驗收 🔲
+## Phase 9 — 實戰驗收 🔶（線上 E2E 已過，剩真實客戶流程）
 
 ### 9a. 三個真實客戶流程
-- [ ] 業務發送連結 → 客戶完成送出 → 業務確認全卡號 → confirm → Timeline 有記錄
-- [ ] 驗證 CVV 不出現在 D1 任何 table（`SELECT * FROM submissions` 確認）
+- [x] 完整流程線上實測（2026-06-10，合成測試資料）：業務端 UI 發送連結 →
+  open → 4 張照片上傳+OCR → submit → 業務端 WS 即時收到 → 解密全卡號 →
+  confirm → destroy。全部 200。
+- [ ] 三個「真實客戶」流程（需實戰，合成資料不算）
+- [x] 驗證 CVV 不出現在 D1 任何 table（remote `pragma_table_info('submissions')` → 無 cvv 欄位）
 - [ ] 驗證 30 天刪除邏輯（手動觸發 Cron，確認敏感欄位變 NULL）
 
 ### 9b. 邊界情境驗收
 - [ ] Token 過期（10 分鐘）→ 客戶畫面顯示失效訊息
-- [ ] 重複送出 → 409，資料不變
+- [x] 重複送出 → 409 Conflict，資料不變（線上實測）
 - [ ] WS 斷線重連 → 資料不丟失
-- [ ] 結案 → 業務端資料清空
+- [x] 結案 destroy → 200，remote D1 確認 card_number_enc 置 NULL（線上實測）
 
 ### 9c. 安全驗收
 - [x] 本地可自動化部分 → `npm run guard:security`（scripts/security-check.sh，6 項全綠）：
@@ -386,3 +389,4 @@
 | 5 | lint 是否全面禁 `as` cast？ | 否。object literal assertion 禁止；D1 row / FormData / JSON 的邊界收窄 `as` 允許（19 處皆此類，全面禁止需大改且無安全收益） | ✅ 已決定 |
 | 6 | server 端 no-console 範圍？ | 禁 `console.log`，允許 `error/warn`（Workers 錯誤日誌正規管道）。配套規則：log 只准印欄位名，不准印值（guard:security 第 6 項把關） | ✅ 已決定 |
 | 7 | CVV 傳輸路徑？ | client → HTTPS POST `/api/token/:id/cvv` → DO WS 轉發業務端。不變量是「CVV 永不落地」而非「不走 HTTP」（client 端無 WS，TLS 下 POST 與 WS 同等安全） | ✅ 已決定 |
+| 8 | OCR 模型選型？ | `@cf/mistralai/mistral-small-3.1-24b-instruct`。實測（2026-06-10）：llava-1.5-7b 跟不住 JSON-only 指令（0/8 成功）；llama-3.2-11b-vision 拒絕辨識信用卡（安全對齊拒答），且民國年轉換錯、中文姓名被羅馬化；Mistral 3.1 卡片+身分證 10/10 全對且輸出逐字節一致。新帳號用 llama 系列前需先提交 'agree' 同意 Meta 授權（AiError 5016） | ✅ 已決定 |

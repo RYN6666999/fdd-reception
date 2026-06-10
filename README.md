@@ -21,7 +21,7 @@ guards/     ← Guard 腳本
 - 前端：Vanilla JavaScript（無框架）
 - 後端：Cloudflare Workers + D1 + Durable Objects
 - 部署：Cloudflare Pages
-- OCR：Tesseract.js（瀏覽器端執行）
+- OCR：Workers AI `@cf/mistralai/mistral-small-3.1-24b-instruct`（後端執行，模型選型見 TODOS 決策表 #8）
 - 即時通訊：WebSocket via Durable Objects
 - Schema 驗證：Zod
 

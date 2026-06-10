@@ -88,7 +88,7 @@ function fillReviewingView(submission) {
   set('name', submission?.ocr_id?.name ?? submission?.name)
   set('id_number', submission?.ocr_id?.id_number ?? submission?.id_number)
   set('birth_date', submission?.ocr_id?.birth_date ?? submission?.birth_date)
-  set('card_last4', submission?.ocr_card?.card_number?.slice(-4) ?? submission?.card_number?.slice(-4))
+  set('card_last4', submission?.ocr_card?.card_last4 ?? submission?.ocr_card?.card_number?.slice(-4) ?? submission?.card_number?.slice(-4))
   set('expiry', submission?.ocr_card?.expiry ?? submission?.expiry)
   set('installment', submission?.installment ? `${submission.installment} 期` : '一次付清')
 }
