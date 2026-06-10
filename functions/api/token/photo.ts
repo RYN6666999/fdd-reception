@@ -44,23 +44,66 @@ export async function handlePhotoUpload(request: Request, env: Env, tokenId: str
   }
 
   let ocr: Record<string, unknown> = {}
+  let ocrRaw = ''
   try {
-    const b64 = uint8ToBase64(bytes)
     const aiResult = await env.AI.run('@cf/llava-hf/llava-1.5-7b-hf', {
       prompt: OCR_PROMPTS[photoType],
       image: Array.from(bytes),
     })
-    const raw = (aiResult as { description?: string }).description ?? ''
-    try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        ocr = JSON.parse(jsonMatch[0])
+    ocrRaw = (aiResult as { description?: string }).description ?? ''
+    const jsonMatch = ocrRaw.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      console.error('[endpoint:photo] ocr_no_json, raw:', ocrRaw.slice(0, 200))
+      if (photoType === 'id_front' || photoType === 'card_front') {
+        return Response.json({ ok: false, ocr_failed: true, field: 'parse', r2_key: r2Key })
       }
-    } catch {
-      console.error('[photo] ocr_json_parse_failed, raw:', raw.slice(0, 200))
+    } else {
+      try {
+        ocr = JSON.parse(jsonMatch[0])
+      } catch (e) {
+        console.error('[endpoint:photo] ocr_parse_failed:', e, 'raw:', ocrRaw.slice(0, 200))
+        if (photoType === 'id_front' || photoType === 'card_front') {
+          return Response.json({ ok: false, ocr_failed: true, field: 'parse', r2_key: r2Key })
+        }
+      }
     }
   } catch (err: unknown) {
-    console.error('[photo] ocr_failed:', err)
+    console.error('[endpoint:photo] ocr_failed:', err)
+    if (photoType === 'id_front' || photoType === 'card_front') {
+      return Response.json({ ok: false, ocr_failed: true, field: 'parse', r2_key: r2Key })
+    }
+  }
+
+  if (photoType === 'id_front') {
+    const idRegex = /^[A-Z][12]\d{8}$/
+    if (!ocr.id_number || !idRegex.test(ocr.id_number as string)) {
+      console.error('[endpoint:photo] ocr_validation_failed: id_number invalid', ocr.id_number)
+      return Response.json({ ok: false, ocr_failed: true, field: 'id_number', r2_key: r2Key })
+    }
+    if (!ocr.name || (ocr.name as string).trim().length < 2) {
+      console.error('[endpoint:photo] ocr_validation_failed: name too short', ocr.name)
+      return Response.json({ ok: false, ocr_failed: true, field: 'name', r2_key: r2Key })
+    }
+    if (!ocr.birth_date || !/^\d{4}-\d{2}-\d{2}$/.test(ocr.birth_date as string)) {
+      console.error('[endpoint:photo] ocr_validation_failed: birth_date format', ocr.birth_date)
+      return Response.json({ ok: false, ocr_failed: true, field: 'birth_date', r2_key: r2Key })
+    }
+  }
+
+  if (photoType === 'card_front') {
+    const digits = ((ocr.card_number as string) || '').replace(/\D/g, '')
+    if (digits.length < 13 || digits.length > 19 || !luhnCheck(digits)) {
+      console.error('[endpoint:photo] ocr_validation_failed: card_number invalid', digits)
+      return Response.json({ ok: false, ocr_failed: true, field: 'card_number', r2_key: r2Key })
+    }
+    if (!ocr.expiry || !/^(0[1-9]|1[0-2])\/\d{2}$/.test(ocr.expiry as string)) {
+      console.error('[endpoint:photo] ocr_validation_failed: expiry format', ocr.expiry)
+      return Response.json({ ok: false, ocr_failed: true, field: 'expiry', r2_key: r2Key })
+    }
+    if (!ocr.holder_name || (ocr.holder_name as string).trim().length < 2) {
+      console.error('[endpoint:photo] ocr_validation_failed: holder_name too short', ocr.holder_name)
+      return Response.json({ ok: false, ocr_failed: true, field: 'holder_name', r2_key: r2Key })
+    }
   }
 
   const column = `${photoType}_key` as const
@@ -75,10 +118,17 @@ export async function handlePhotoUpload(request: Request, env: Env, tokenId: str
   return Response.json({ ok: true, r2_key: r2Key, ocr })
 }
 
-function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]!)
+function luhnCheck(num: string): boolean {
+  let sum = 0
+  let alt = false
+  for (let i = num.length - 1; i >= 0; i--) {
+    let n = parseInt(num[i]!, 10)
+    if (alt) {
+      n *= 2
+      if (n > 9) n -= 9
+    }
+    sum += n
+    alt = !alt
   }
-  return btoa(binary)
+  return sum % 10 === 0
 }
