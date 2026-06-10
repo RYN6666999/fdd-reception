@@ -11,6 +11,7 @@
     "guard:security": "bash scripts/security-check.sh",
     "guard:all": "npm run guard:specs && npm run guard:contracts && npm run guard:types && npm run guard:lint && npm run guard:security",
     "smoke": "bash scripts/smoke-test.sh",
+    "test:ocr": "bash scripts/ocr-test.sh",
     "deploy": "npx wrangler deploy && npm run smoke",
     "dev": "npx wrangler dev"
   },

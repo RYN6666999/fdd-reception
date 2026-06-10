@@ -39,7 +39,23 @@ guard:all        → 全部跑過才能 deploy（CI 同步阻斷 PR）
 ```bash
 npm run guard:all        # deploy 前的門
 npm run smoke            # deploy 後的線上煙霧測試
+npm run test:ocr         # OCR 回歸測試（打真實 Workers AI，有少量費用，不進 guard:all）
 ```
+
+## OCR 除錯（先跑這個，不要從頭猜）
+
+OCR 出問題時，一條命令重現整條管線：
+
+```bash
+npm run test:ocr                                  # 對 production
+bash scripts/ocr-test.sh http://localhost:8787    # 對本機 wrangler dev
+```
+
+測試圖在 `test/fixtures/ocr/`（全合成資料：Visa 官方測試卡號、教科書身分證範例），
+涵蓋傳統凸字卡、新式卡（卡號印在背面）、民國年轉換、CVV 不洩漏。
+重新產圖：`python3 scripts/generate-ocr-fixtures.py`。
+
+開發期迭代用 `npx wrangler dev --remote`（AI binding 可用），改完不用每次 deploy。
 
 ## 開發進度
 
