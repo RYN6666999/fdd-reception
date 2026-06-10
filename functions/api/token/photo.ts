@@ -44,16 +44,16 @@ export async function handlePhotoUpload(request: Request, env: Env, tokenId: str
   }
 
   let ocr: Record<string, unknown> = {}
-  let ocrRaw = ''
   try {
     const aiResult = await env.AI.run('@cf/llava-hf/llava-1.5-7b-hf', {
       prompt: OCR_PROMPTS[photoType],
       image: Array.from(bytes),
     })
-    ocrRaw = (aiResult as { description?: string }).description ?? ''
+    const ocrRaw = (aiResult as { description?: string }).description ?? ''
     const jsonMatch = ocrRaw.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      console.error('[endpoint:photo] ocr_no_json, raw:', ocrRaw.slice(0, 200))
+      // raw OCR text contains the card/ID data itself — log length only, never content
+      console.error('[endpoint:photo] ocr_no_json, raw_length:', ocrRaw.length)
       if (photoType === 'id_front' || photoType === 'card_front') {
         return Response.json({ ok: false, ocr_failed: true, field: 'parse', r2_key: r2Key })
       }
@@ -61,7 +61,7 @@ export async function handlePhotoUpload(request: Request, env: Env, tokenId: str
       try {
         ocr = JSON.parse(jsonMatch[0])
       } catch (e) {
-        console.error('[endpoint:photo] ocr_parse_failed:', e, 'raw:', ocrRaw.slice(0, 200))
+        console.error('[endpoint:photo] ocr_parse_failed:', e, 'raw_length:', ocrRaw.length)
         if (photoType === 'id_front' || photoType === 'card_front') {
           return Response.json({ ok: false, ocr_failed: true, field: 'parse', r2_key: r2Key })
         }
@@ -77,15 +77,16 @@ export async function handlePhotoUpload(request: Request, env: Env, tokenId: str
   if (photoType === 'id_front') {
     const idRegex = /^[A-Z][12]\d{8}$/
     if (!ocr.id_number || !idRegex.test(ocr.id_number as string)) {
-      console.error('[endpoint:photo] ocr_validation_failed: id_number invalid', ocr.id_number)
+      // PII: never log the OCR'd value itself, only which field failed
+      console.error('[endpoint:photo] ocr_validation_failed: id_number invalid')
       return Response.json({ ok: false, ocr_failed: true, field: 'id_number', r2_key: r2Key })
     }
     if (!ocr.name || (ocr.name as string).trim().length < 2) {
-      console.error('[endpoint:photo] ocr_validation_failed: name too short', ocr.name)
+      console.error('[endpoint:photo] ocr_validation_failed: name too short')
       return Response.json({ ok: false, ocr_failed: true, field: 'name', r2_key: r2Key })
     }
     if (!ocr.birth_date || !/^\d{4}-\d{2}-\d{2}$/.test(ocr.birth_date as string)) {
-      console.error('[endpoint:photo] ocr_validation_failed: birth_date format', ocr.birth_date)
+      console.error('[endpoint:photo] ocr_validation_failed: birth_date format')
       return Response.json({ ok: false, ocr_failed: true, field: 'birth_date', r2_key: r2Key })
     }
   }
@@ -93,15 +94,15 @@ export async function handlePhotoUpload(request: Request, env: Env, tokenId: str
   if (photoType === 'card_front') {
     const digits = ((ocr.card_number as string) || '').replace(/\D/g, '')
     if (digits.length < 13 || digits.length > 19 || !luhnCheck(digits)) {
-      console.error('[endpoint:photo] ocr_validation_failed: card_number invalid', digits)
+      console.error('[endpoint:photo] ocr_validation_failed: card_number invalid')
       return Response.json({ ok: false, ocr_failed: true, field: 'card_number', r2_key: r2Key })
     }
     if (!ocr.expiry || !/^(0[1-9]|1[0-2])\/\d{2}$/.test(ocr.expiry as string)) {
-      console.error('[endpoint:photo] ocr_validation_failed: expiry format', ocr.expiry)
+      console.error('[endpoint:photo] ocr_validation_failed: expiry format')
       return Response.json({ ok: false, ocr_failed: true, field: 'expiry', r2_key: r2Key })
     }
     if (!ocr.holder_name || (ocr.holder_name as string).trim().length < 2) {
-      console.error('[endpoint:photo] ocr_validation_failed: holder_name too short', ocr.holder_name)
+      console.error('[endpoint:photo] ocr_validation_failed: holder_name too short')
       return Response.json({ ok: false, ocr_failed: true, field: 'holder_name', r2_key: r2Key })
     }
   }

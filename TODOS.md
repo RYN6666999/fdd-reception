@@ -309,7 +309,7 @@
 
 ---
 
-## Phase 8 — Guard Pipeline 完整化 🔲
+## Phase 8 — Guard Pipeline 完整化 ✅
 
 ### 8a. 更新 guard:contracts
 - [x] 加入 tsc 型別檢查（`npx tsc --noEmit`）
@@ -317,18 +317,23 @@
 - [x] 確保所有 schema tests PASSED
 
 ### 8b. guard:lint
-- [ ] 設定 ESLint（`eslint.config.mjs`）
-  - `no-any`、`no-as-cast`（透過 @typescript-eslint rules）
-  - `no-console`（server 端）
-- [ ] `npm run guard:lint` PASSED
+- [x] 設定 ESLint（`eslint.config.mjs`，flat config + typescript-eslint）
+  - `no-explicit-any`：error（修掉 card.ts 的 `catch (err: any)`）
+  - `consistent-type-assertions`：object literal assertion 禁止；邊界收窄
+    （D1 row / FormData / JSON）的值層級 `as` 允許 → 見決策表 #5
+  - `no-console`（server 端）：禁 `console.log`，允許 `error/warn`
+    （Workers 錯誤日誌的正規管道）→ 見決策表 #6
+- [x] `npm run guard:lint` PASSED
 
 ### 8c. CI
-- [ ] `.github/workflows/guard.yml`
+- [x] `.github/workflows/guard.yml`
   - PR 阻斷：`npm run guard:all`
   - 失敗 → PR 不可合併
+  - Actions 全部 SHA pin（checkout v5.0.0 / setup-bun v2.0.2 / setup-node v4.4.0）
 
 ### 8d. 最終 guard:all 確認
-- [ ] `npm run guard:all` 在乾淨 clone 上跑通
+- [x] `npm run guard:all` 在乾淨 clone 上跑通（rsync → temp dir → `npm ci` → 全綠）
+- [x] 新增 `guard:security`（`scripts/security-check.sh`）接進 guard:all
 
 ---
 
@@ -346,9 +351,17 @@
 - [ ] 結案 → 業務端資料清空
 
 ### 9c. 安全驗收
-- [ ] `grep -r "cvv\|CVV" .wrangler/` → 無結果
-- [ ] D1 查詢卡號欄位 → 只看到加密 blob
-- [ ] 瀏覽器 DevTools Network → CVV 不出現在任何 HTTP request body
+- [x] 本地可自動化部分 → `npm run guard:security`（scripts/security-check.sh，6 項全綠）：
+  - D1 schema / migrations 無 CVV 欄位
+  - SubmissionSchema 無 CVV 欄位
+  - server log 語句不含 CVV、不輸出 PII 變數
+  - cvv.ts 純轉發無 DB 寫入
+  - `.wrangler/` 無 CVV 殘留
+- [ ] D1 查詢卡號欄位（--remote）→ 只看到加密 blob
+- [ ] 真實流程後 `SELECT * FROM submissions` → 無 CVV 欄位
+- [ ] ~~CVV 不出現在任何 HTTP request body~~ → 條款過時，Wave 3 改為
+  client → HTTPS POST `/api/token/:id/cvv` → DO WS 轉發（見決策表 #7）。
+  改驗：CVV 不落地（不進 D1、不進 log、不進 R2）
 
 ---
 
@@ -370,3 +383,6 @@
 | 2 | 業務多 Token 並行？ | 串行：一個客戶處理完再下一位，並行永遠不做 | ✅ 已決定 |
 | 3 | 完整卡號確認方式？ | 人工確認（confirming 阻斷狀態），不需 PIN | ✅ 已決定 |
 | 4 | Admin CSV 匯出？ | Out of Scope（本期不做） | ✅ 已決定 |
+| 5 | lint 是否全面禁 `as` cast？ | 否。object literal assertion 禁止；D1 row / FormData / JSON 的邊界收窄 `as` 允許（19 處皆此類，全面禁止需大改且無安全收益） | ✅ 已決定 |
+| 6 | server 端 no-console 範圍？ | 禁 `console.log`，允許 `error/warn`（Workers 錯誤日誌正規管道）。配套規則：log 只准印欄位名，不准印值（guard:security 第 6 項把關） | ✅ 已決定 |
+| 7 | CVV 傳輸路徑？ | client → HTTPS POST `/api/token/:id/cvv` → DO WS 轉發業務端。不變量是「CVV 永不落地」而非「不走 HTTP」（client 端無 WS，TLS 下 POST 與 WS 同等安全） | ✅ 已決定 |

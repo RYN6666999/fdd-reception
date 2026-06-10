@@ -24,6 +24,9 @@ export async function handleExpireTokens(env: Env): Promise<void> {
         method: 'POST',
         body: JSON.stringify({ type: 'expired' })
       })
-    } catch {}
+    } catch (err) {
+      // WS 推送失敗不阻斷批次過期；業務端重連時會拿 snapshot 補狀態
+      console.error('[cron:expire] broadcast_failed:', token.id, err)
+    }
   }
 }

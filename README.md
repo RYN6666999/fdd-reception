@@ -29,34 +29,36 @@ guards/     ← Guard 腳本
 
 ```
 guard:specs      → 確保 SPEC.md 完整
-guard:contracts  → 確保 Zod schemas 存在
+guard:contracts  → Zod schemas 存在 + contract tests（bun test）
 guard:types      → TypeScript 型別檢查
-guard:lint       → ESLint
-guard:all        → 全部跑過才能 deploy
+guard:lint       → ESLint（no-explicit-any、server 端 no-console）
+guard:security   → CVV / PII 不落地檢查（scripts/security-check.sh）
+guard:all        → 全部跑過才能 deploy（CI 同步阻斷 PR）
 ```
 
 ```bash
-npm run guard:specs      # Phase 0 → 1 的門
-npm run guard:contracts  # Phase 1 → 2 的門
 npm run guard:all        # deploy 前的門
+npm run smoke            # deploy 後的線上煙霧測試
 ```
 
 ## 開發進度
 
 - [x] Phase 0：骨架 + SPEC.md
-- [ ] Phase 1：Contracts Baseline
-- [ ] Phase 2：後端 Token Pipeline
-- [ ] Phase 3：客戶端拍照 + OCR
-- [ ] Phase 4：客戶端確認 + 上傳
-- [ ] Phase 5：業務端懸浮資料卡
-- [ ] Phase 6：敏感資料保護
-- [ ] Phase 7：管理後台 Timeline
-- [ ] Phase 8：Guard Pipeline 完整化
-- [ ] Phase 9：實戰驗收
+- [x] Phase 1：Contracts Baseline
+- [x] Phase 2：後端 Token Pipeline
+- [x] Phase 3：客戶端拍照 + OCR
+- [x] Phase 4：客戶端確認 + 上傳
+- [x] Phase 5：業務端懸浮資料卡
+- [x] Phase 6：敏感資料保護
+- [x] Phase 7：管理後台 Timeline
+- [x] Phase 8：Guard Pipeline 完整化（ESLint + CI + guard:security）
+- [ ] Phase 9：實戰驗收（剩部署環境的手動驗收，見 TODOS.md）
 
-## [需 Ryan 確認] 開放問題
+## CVV 處理原則
 
-1. `specs/client.spec.md` — OCR 是否需要同時辨識信用卡正反面？
-2. `specs/operator.spec.md` — 業務是否會同時服務多名客戶（多 Token 同時顯示）？
-3. `specs/operator.spec.md` — 卡號是否需要 PIN 二次確認才能顯示全部？
-4. `specs/admin.spec.md` — 是否需要匯出 CSV？
+CVV 永不落地：不進 D1、不進 log、不進 R2。
+路徑：client → HTTPS POST `/api/token/:id/cvv` → Durable Object WS 即時轉發業務端。
+業務端顯示後自動清除（切 tab / 結案 / 複製後 60 秒）。
+`npm run guard:security` 在每次 guard:all 自動驗證此不變量。
+
+開放問題的決定記錄在 `TODOS.md` 決策表。
