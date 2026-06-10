@@ -1,6 +1,5 @@
 import { decrypt } from '../../utils/crypto'
-
-interface Env { DB: D1Database; ENCRYPTION_KEY: string }
+import type { Env } from '../../types/env'
 
 export async function handleGetCard(request: Request, env: Env, tokenId: string): Promise<Response> {
   const operatorId = request.headers.get('Authorization')?.replace('Bearer ', '')

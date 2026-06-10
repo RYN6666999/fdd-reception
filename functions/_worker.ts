@@ -7,15 +7,10 @@ import { handleCvv } from './api/token/cvv'
 import { handleGetCard } from './api/token/card'
 import { handleOperatorHistory } from './api/operator/history'
 import { handleRedirect } from './api/token/redirect'
+import { handlePhotoUpload } from './api/token/photo'
 import { handleExpireTokens } from './cron/expire-tokens'
 import { handleCleanupSensitive } from './cron/cleanup-sensitive'
-
-interface Env {
-  DB: D1Database
-  ENCRYPTION_KEY: string
-  SESSION_ROOM: DurableObjectNamespace
-  ASSETS: { fetch: (req: Request) => Promise<Response> }
-}
+import type { Env } from './types/env'
 
 export { SessionRoom } from './durable-objects/session-room'
 
@@ -38,6 +33,7 @@ export default {
       if (method === 'POST' && action === 'submit') return handleSubmit(request, env, tokenId!)
       if (method === 'POST' && action === 'cvv') return handleCvv(request, env, tokenId!)
       if (method === 'GET' && action === 'card') return handleGetCard(request, env, tokenId!)
+      if (method === 'POST' && action === 'photo') return handlePhotoUpload(request, env, tokenId!)
     }
 
     // GET /c/:shortCode → redirect to client
@@ -46,6 +42,7 @@ export default {
 
     // GET /api/operator/history
     if (method === 'GET' && path === '/api/operator/history') return handleOperatorHistory(request, env)
+
 
     // WebSocket: GET /api/session/:id/ws → proxy to Durable Object
     const sessionMatch = path.match(/^\/api\/session\/([^/]+)\/ws$/)

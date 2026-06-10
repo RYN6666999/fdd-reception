@@ -1,12 +1,9 @@
 import { generateId } from '../../utils/id'
 import { encrypt } from '../../utils/crypto'
 import { SubmissionSchema } from '../../../contracts/submission.schema'
+import type { Env } from '../../types/env'
 
-interface Env {
-  DB: D1Database
-  ENCRYPTION_KEY: string
-  SESSION_ROOM: DurableObjectNamespace
-}
+const REQUIRED_PHOTOS = ['id_front', 'id_back', 'card_front', 'card_back'] as const
 
 export async function handleSubmit(request: Request, env: Env, tokenId: string): Promise<Response> {
   const token = await env.DB.prepare(`SELECT * FROM tokens WHERE id = ?`).bind(tokenId).first()
@@ -15,35 +12,30 @@ export async function handleSubmit(request: Request, env: Env, tokenId: string):
   if (token.status === 'issued') return new Response('not opened', { status: 409 })
   if (token.status === 'uploaded' || token.status === 'confirmed') return new Response('Conflict', { status: 409 })
 
-  const formData = await request.formData()
-  const submissionJson = formData.get('submission') as string
-  const photo = formData.get('photo') as File | null
-
-  if (!submissionJson) return new Response('Bad Request', { status: 400 })
-  if (!photo) return new Response('photo required', { status: 400 })
-
-  let parsed: unknown
+  let body: unknown
   try {
-    parsed = JSON.parse(submissionJson)
+    body = await request.json()
   } catch {
     return new Response('invalid JSON', { status: 400 })
   }
-  const result = SubmissionSchema.safeParse(parsed)
+
+  const result = SubmissionSchema.safeParse(body)
   if (!result.success) {
-    console.error('[submit] zod failed:', result.error.flatten())
+    console.error('[submit] zod_failed:', result.error.flatten())
     return new Response('invalid submission', { status: 400 })
   }
   const submission = result.data
 
-  // 驗證 photo hash
-  const buf = await photo.arrayBuffer()
-  const hashBuf = await crypto.subtle.digest('SHA-256', buf)
-  const hash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('')
-  if (hash !== submission.photo_hash) {
-    return new Response('Watermark verification failed', { status: 400 })
+  const missingPhotos: string[] = []
+  for (const photoType of REQUIRED_PHOTOS) {
+    const r2Key = `${tokenId}/${photoType}.jpg`
+    const obj = await env.PHOTOS.head(r2Key)
+    if (!obj) missingPhotos.push(photoType)
+  }
+  if (missingPhotos.length > 0) {
+    return new Response(`missing photos: ${missingPhotos.join(', ')}`, { status: 400 })
   }
 
-  // 加密敏感欄位
   let cardNumEnc: string | null
   let idNumEnc: string | null
   try {
@@ -53,23 +45,28 @@ export async function handleSubmit(request: Request, env: Env, tokenId: string):
     idNumEnc = submission.ocr_id?.id_number
       ? await encrypt(submission.ocr_id.id_number, env.ENCRYPTION_KEY)
       : null
-  } catch (err: any) {
-    console.error('[submit] crypto_failed:', err?.message)
-    return new Response('crypto failed', { status: 500 })
+  } catch (err: unknown) {
+    console.error('[submit] crypto_failed:', err)
+    return new Response('crypto error', { status: 500 })
   }
 
   const submissionId = generateId()
   const now = new Date().toISOString()
 
   await env.DB.prepare(`
-    INSERT INTO submissions (id, token_id, card_number_enc, id_number_enc, holder_name, expiry, installment, photo_hash, submitted_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO submissions (id, token_id, card_number_enc, id_number_enc, holder_name, expiry, installment, photo_hash,
+      id_front_key, id_back_key, card_front_key, card_back_key, submitted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     submissionId, tokenId, cardNumEnc, idNumEnc,
     submission.ocr_card?.holder_name ?? null,
     submission.ocr_card?.expiry ?? null,
     submission.installment ?? null,
     submission.photo_hash,
+    `${tokenId}/id_front.jpg`,
+    `${tokenId}/id_back.jpg`,
+    `${tokenId}/card_front.jpg`,
+    `${tokenId}/card_back.jpg`,
     now
   ).run()
 
@@ -80,7 +77,6 @@ export async function handleSubmit(request: Request, env: Env, tokenId: string):
     VALUES (?, 'token_submitted', ?, ?, ?)
   `).bind(generateId(), tokenId, token.operator_id as string, now).run()
 
-  // 透過 Durable Object 推送 uploaded 事件給業務端（不含 CVV，CVV 走另一個端點）
   const roomId = env.SESSION_ROOM.idFromName(tokenId)
   const room = env.SESSION_ROOM.get(roomId)
   await room.fetch('http://internal/broadcast', {
@@ -88,7 +84,7 @@ export async function handleSubmit(request: Request, env: Env, tokenId: string):
     body: JSON.stringify({
       type: 'uploaded',
       submission: {
-        ocr_card: { ...submission.ocr_card, card_number: undefined }, // 不推全卡號
+        ocr_card: { ...submission.ocr_card, card_number: undefined },
         ocr_id: submission.ocr_id,
         installment: submission.installment,
       }

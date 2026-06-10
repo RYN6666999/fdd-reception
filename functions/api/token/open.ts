@@ -1,6 +1,5 @@
 import { generateId } from '../../utils/id'
-
-interface Env { DB: D1Database }
+import type { Env } from '../../types/env'
 
 const TTL_MINUTES = 10
 

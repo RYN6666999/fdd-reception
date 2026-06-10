@@ -1,6 +1,5 @@
 import { generateId } from '../../utils/id'
-
-interface Env { DB: D1Database }
+import type { Env } from '../../types/env'
 
 export async function handleConfirm(request: Request, env: Env, tokenId: string): Promise<Response> {
   const operatorId = request.headers.get('Authorization')?.replace('Bearer ', '')
