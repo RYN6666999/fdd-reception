@@ -1,21 +1,17 @@
 import { startCamera, stopCamera, captureFrame, fileToCanvas } from './camera.js'
 import { applyWatermark, sha256, canvasToBlob } from './watermark.js'
-import { ocrCard } from './ocr-card.js'
-import { ocrId } from './ocr-id.js'
 import { luhn, validateTwId, notExpired, setError, clearError } from './validate.js'
-import { submitData } from './api.js'
+import { uploadPhoto, submitData } from './api.js'
 
 const tokenId = new URLSearchParams(location.search).get('token')
 let currentStep = 0
 let cameraStream = null
 const collectedData = {
-  idFrontBlob: null, idBackBlob: null,
-  cardFrontBlob: null, cardBackBlob: null,
   photoHashes: [],
-  ocr: {}
+  ocr: {},
+  uploadedTypes: new Set(),
 }
 
-// --- View helpers ---
 function showView(id) {
   ['view-loading','view-invalid','view-error','wizard','view-done'].forEach(v => {
     const el = document.getElementById(v)
@@ -38,9 +34,7 @@ function updateProgress(n) {
   })
 }
 
-// --- Camera helpers ---
-// blobKey: 拍完後把 blob 存進 collectedData[blobKey]，確保 doSubmit 能取到真實照片
-async function setupCapture(stepNum, videoContainerId, btnCaptureId, fileInputId, fieldsId, btnNextId, processCallback, blobKey) {
+async function setupCapture(stepNum, videoContainerId, btnCaptureId, fileInputId, fieldsId, btnNextId, photoType) {
   const container = document.getElementById(videoContainerId)
   const btnCapture = document.getElementById(btnCaptureId)
   const fileInput = document.getElementById(fileInputId)
@@ -61,7 +55,7 @@ async function setupCapture(stepNum, videoContainerId, btnCaptureId, fileInputId
   btnCapture.onclick = async () => {
     const canvas = captureFrame(video)
     stopCamera(cameraStream)
-    await processCapture(canvas, container, fieldsId, btnNextId, processCallback, blobKey)
+    await processCapture(canvas, container, fieldsId, btnNextId, photoType)
   }
 
   fileInput.onchange = async (e) => {
@@ -69,11 +63,11 @@ async function setupCapture(stepNum, videoContainerId, btnCaptureId, fileInputId
     if (!file) return
     stopCamera(cameraStream)
     const canvas = await fileToCanvas(file)
-    await processCapture(canvas, container, fieldsId, btnNextId, processCallback, blobKey)
+    await processCapture(canvas, container, fieldsId, btnNextId, photoType)
   }
 }
 
-async function processCapture(canvas, container, fieldsId, btnNextId, processCallback, blobKey) {
+async function processCapture(canvas, container, fieldsId, btnNextId, photoType) {
   const preview = document.createElement('img')
   preview.style.cssText = 'width:100%;height:100%;object-fit:cover;'
   container.innerHTML = ''
@@ -81,58 +75,49 @@ async function processCapture(canvas, container, fieldsId, btnNextId, processCal
   const { blob, hash } = await applyWatermark(canvas, tokenId)
   collectedData.photoHashes.push(hash)
 
-  // 把真實浮水印 blob 存入 collectedData，讓 doSubmit 能取到正確的照片做 hash 驗證
-  if (blobKey) {
-    collectedData[blobKey] = blob
-  }
-
   preview.src = URL.createObjectURL(blob)
   container.appendChild(preview)
 
-  if (fieldsId) {
-    const fields = document.getElementById(fieldsId)
-    if (fields) fields.hidden = false
-    processCallback(blob, hash)
+  const btnNext = document.getElementById(btnNextId)
+  btnNext.disabled = true
+  btnNext.textContent = '上傳中...'
+
+  try {
+    const result = await uploadPhoto(tokenId, blob, photoType)
+    collectedData.uploadedTypes.add(photoType)
+
+    if (result.ocr && fieldsId) {
+      fillOcrFields(photoType, result.ocr)
+    }
+
+    if (fieldsId) {
+      const fields = document.getElementById(fieldsId)
+      if (fields) fields.hidden = false
+    }
+
+    btnNext.disabled = false
+    btnNext.textContent = '下一步'
+  } catch (err) {
+    console.error('[app] upload_failed:', err)
+    btnNext.disabled = false
+    btnNext.textContent = '下一步（上傳失敗，可重拍）'
   }
-
-  document.getElementById(btnNextId).disabled = false
-  return blob
 }
 
-// --- OCR handlers ---
-async function processIdFront(blob) {
-  try {
-    const result = await ocrId(blob)
-    if (result.name) document.getElementById('id-name').value = result.name
-    if (result.id_number) document.getElementById('id-number').value = result.id_number
-    if (result.birth_date) document.getElementById('id-birth').value = result.birth_date
-    collectedData.ocr.idFront = result
-  } catch {}
+function fillOcrFields(photoType, ocr) {
+  if (photoType === 'id_front') {
+    if (ocr.name) document.getElementById('id-name').value = ocr.name
+    if (ocr.id_number) document.getElementById('id-number').value = ocr.id_number
+    if (ocr.birth_date) document.getElementById('id-birth').value = ocr.birth_date
+    collectedData.ocr.idFront = ocr
+  } else if (photoType === 'card_front') {
+    if (ocr.card_number) document.getElementById('card-number').value = ocr.card_number.replace(/(.{4})/g, '$1 ').trim()
+    if (ocr.expiry) document.getElementById('card-expiry').value = ocr.expiry
+    if (ocr.holder_name) document.getElementById('card-holder').value = ocr.holder_name
+    collectedData.ocr.cardFront = ocr
+  }
 }
 
-async function processCardFront(blob) {
-  try {
-    const result = await ocrCard(blob)
-    if (result.card_number) document.getElementById('card-number').value = result.card_number.replace(/(.{4})/g, '$1 ').trim()
-    if (result.expiry) document.getElementById('card-expiry').value = result.expiry
-    if (result.holder_name) document.getElementById('card-holder').value = result.holder_name
-    collectedData.ocr.cardFront = result
-  } catch {}
-}
-
-async function processCardBack(blob) {
-  try {
-    const worker = await Tesseract.createWorker('eng')
-    const url = URL.createObjectURL(blob)
-    const { data } = await worker.recognize(url)
-    URL.revokeObjectURL(url)
-    await worker.terminate()
-    const cvvMatch = data.text.match(/\b\d{3,4}\b/)
-    if (cvvMatch) document.getElementById('card-cvv').value = cvvMatch[0]
-  } catch {}
-}
-
-// --- Step navigation ---
 function setupNextButton(btnId, validator, onNext) {
   const btn = document.getElementById(btnId)
   btn.onclick = () => {
@@ -141,43 +126,35 @@ function setupNextButton(btnId, validator, onNext) {
   }
 }
 
-// --- Init ---
 async function init() {
   if (!tokenId) {
     showView('view-invalid')
     return
   }
 
-  // /open 只是狀態追蹤，非同步 fire-and-forget
-  // 失敗不擋住客戶填表（只有真正 expired/destroyed 才顯示失效）
   try {
     const res = await fetch(`/api/token/${tokenId}/open`, { method: 'POST' })
     if (res.status === 410) {
-      // 410 = expired 或 destroyed，才真正拒絕
       showView('view-invalid')
       return
     }
   } catch {
-    // 網路問題也讓客戶繼續，submit 時再擋
+    // network error — let user continue, submit will catch
   }
 
   showView('wizard')
   goToStep(0)
 
-  // Setup step 0: 身分證正面
-  await setupCapture(0, 'capture-id-front', 'btn-capture-id-front', 'file-id-front', 'fields-id-front', 'btn-next-0', processIdFront, 'idFrontBlob')
+  await setupCapture(0, 'capture-id-front', 'btn-capture-id-front', 'file-id-front', 'fields-id-front', 'btn-next-0', 'id_front')
   setupNextButton('btn-next-0', null, () => goToStep(1))
 
-  // Setup step 1: 身分證背面（拍完即可下一步，無 OCR fields）
-  await setupCapture(1, 'capture-id-back', 'btn-capture-id-back', 'file-id-back', null, 'btn-next-1', () => {}, 'idBackBlob')
+  await setupCapture(1, 'capture-id-back', 'btn-capture-id-back', 'file-id-back', null, 'btn-next-1', 'id_back')
   setupNextButton('btn-next-1', null, () => goToStep(2))
 
-  // Setup step 2: 信用卡正面
-  await setupCapture(2, 'capture-card-front', 'btn-capture-card-front', 'file-card-front', 'fields-card-front', 'btn-next-2', processCardFront, 'cardFrontBlob')
+  await setupCapture(2, 'capture-card-front', 'btn-capture-card-front', 'file-card-front', 'fields-card-front', 'btn-next-2', 'card_front')
   setupNextButton('btn-next-2', null, () => goToStep(3))
 
-  // Setup step 3: 信用卡背面 + CVV
-  await setupCapture(3, 'capture-card-back', 'btn-capture-card-back', 'file-card-back', null, 'btn-next-3', processCardBack, 'cardBackBlob')
+  await setupCapture(3, 'capture-card-back', 'btn-capture-card-back', 'file-card-back', null, 'btn-next-3', 'card_back')
   document.getElementById('card-cvv').addEventListener('input', (e) => {
     document.getElementById('btn-next-3').disabled = e.target.value.length < 3
   })
@@ -186,7 +163,6 @@ async function init() {
     goToStep(4)
   })
 
-  // Step 4: 確認送出
   document.getElementById('btn-back-to-edit').onclick = () => goToStep(2)
 
   document.getElementById('btn-submit').onclick = async () => {
@@ -197,9 +173,10 @@ async function init() {
       await doSubmit()
       showView('view-done')
     } catch (err) {
+      console.error('[app] submit_failed:', err)
       btn.disabled = false
       btn.textContent = '確認送出'
-      alert(err.message === 'ALREADY_SUBMITTED' ? '資料已送出，請勿重複操作。' : err.message === 'PHOTO_MISSING' ? '請先完成所有拍照步驟後再送出。' : '送出失敗，請重試。')
+      alert(err.message === 'ALREADY_SUBMITTED' ? '資料已送出，請勿重複操作。' : '送出失敗，請重試。')
     }
   }
 }
@@ -220,21 +197,27 @@ async function doSubmit() {
   const cvv = document.getElementById('card-cvv').value
   const photoHash = collectedData.photoHashes[0] ?? ''
 
-  // 防禦：photoHashes[0] 和 idFrontBlob 必須同時存在，否則 server 端 SHA-256 會不符
-  if (!collectedData.idFrontBlob || !photoHash) {
+  const requiredTypes = ['id_front', 'id_back', 'card_front', 'card_back']
+  const missing = requiredTypes.filter(t => !collectedData.uploadedTypes.has(t))
+  if (missing.length > 0) {
     throw new Error('PHOTO_MISSING')
   }
 
   await submitData(tokenId, {
-    card_number: cardNum,
-    expiry: document.getElementById('card-expiry').value,
-    holder_name: document.getElementById('card-holder').value || undefined,
-    name: document.getElementById('id-name').value,
-    id_number: document.getElementById('id-number').value,
-    birth_date: document.getElementById('id-birth').value,
-    installment: document.getElementById('card-installment').value || undefined,
-    extra_photo_hashes: collectedData.photoHashes.slice(1),
-  }, collectedData.idFrontBlob, photoHash)
+    token_id: tokenId,
+    ocr_card: {
+      card_number: cardNum,
+      expiry: document.getElementById('card-expiry').value,
+      holder_name: document.getElementById('card-holder').value || undefined,
+    },
+    ocr_id: {
+      name: document.getElementById('id-name').value,
+      id_number: document.getElementById('id-number').value,
+      birth_date: document.getElementById('id-birth').value,
+    },
+    installment: document.getElementById('card-installment').value ? parseInt(document.getElementById('card-installment').value) : undefined,
+    photo_hash: photoHash,
+  })
 
   if (cvv) {
     await fetch(`/api/token/${tokenId}/cvv`, {
@@ -245,7 +228,6 @@ async function doSubmit() {
   }
 }
 
-// 修正 wizard-track 寬度（動態計算）
 function fixTrackWidth() {
   const track = document.getElementById('wizard-track')
   if (!track) return

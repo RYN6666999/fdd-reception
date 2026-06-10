@@ -20,5 +20,20 @@ export async function handleConfirm(request: Request, env: Env, tokenId: string)
      VALUES (?, 'token_confirmed', ?, ?, ?)`
   ).bind(generateId(), tokenId, token['operator_id'] as string, now).run()
 
+  // R2 cleanup: delete photos after confirmation
+  const photoKeys = ['id_front', 'id_back', 'card_front', 'card_back']
+  for (const key of photoKeys) {
+    try {
+      await env.PHOTOS.delete(`${tokenId}/${key}.jpg`)
+    } catch (err: unknown) {
+      console.error('[confirm] r2_delete_failed:', err)
+    }
+  }
+
+  // Clear sensitive fields from DB
+  await env.DB.prepare(
+    `UPDATE submissions SET card_number_enc=NULL, id_number_enc=NULL WHERE token_id=?`
+  ).bind(tokenId).run()
+
   return Response.json({ id: tokenId, status: 'confirmed', confirmed_at: now })
 }

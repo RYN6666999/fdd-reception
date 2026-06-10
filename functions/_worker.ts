@@ -7,6 +7,7 @@ import { handleCvv } from './api/token/cvv'
 import { handleGetCard } from './api/token/card'
 import { handleOperatorHistory } from './api/operator/history'
 import { handleRedirect } from './api/token/redirect'
+import { handlePhotoUpload } from './api/token/photo'
 import { handleExpireTokens } from './cron/expire-tokens'
 import { handleCleanupSensitive } from './cron/cleanup-sensitive'
 import type { Env } from './types/env'
@@ -32,6 +33,7 @@ export default {
       if (method === 'POST' && action === 'submit') return handleSubmit(request, env, tokenId!)
       if (method === 'POST' && action === 'cvv') return handleCvv(request, env, tokenId!)
       if (method === 'GET' && action === 'card') return handleGetCard(request, env, tokenId!)
+      if (method === 'POST' && action === 'photo') return handlePhotoUpload(request, env, tokenId!)
     }
 
     // GET /c/:shortCode → redirect to client

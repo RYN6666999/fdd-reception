@@ -1,28 +1,26 @@
-export async function submitData(tokenId, formData, photoBlob, photoHash) {
-  // Step 1: 送出 submission（不含 CVV）
-  const submission = {
-    token_id: tokenId,
-    ocr_card: {
-      card_number: formData.card_number.replace(/\s|-/g, ''),
-      expiry: formData.expiry,
-      holder_name: formData.holder_name || undefined,
-    },
-    ocr_id: {
-      name: formData.name,
-      id_number: formData.id_number,
-      birth_date: formData.birth_date,
-    },
-    installment: formData.installment ? parseInt(formData.installment) : undefined,
-    photo_hash: photoHash,
+export async function uploadPhoto(tokenId, blob, type) {
+  const form = new FormData()
+  form.append('photo', blob, `${type}.jpg`)
+  form.append('type', type)
+
+  const res = await fetch(`/api/token/${tokenId}/photo`, {
+    method: 'POST',
+    body: form,
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`upload_${type}_failed: ${res.status}`)
   }
 
-  const formPayload = new FormData()
-  formPayload.append('submission', JSON.stringify(submission))
-  formPayload.append('photo', photoBlob, 'photo.jpg')
+  return res.json()
+}
 
+export async function submitData(tokenId, payload) {
   const res = await fetch(`/api/token/${tokenId}/submit`, {
     method: 'POST',
-    body: formPayload,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   })
 
   if (res.status === 409) throw new Error('ALREADY_SUBMITTED')
