@@ -1,4 +1,4 @@
-interface Env { DB: D1Database; SESSION_ROOM: DurableObjectNamespace }
+import type { Env } from '../../types/env'
 
 export async function handleCvv(request: Request, env: Env, tokenId: string): Promise<Response> {
   const body = await request.json() as { token_id: string; cvv: string }

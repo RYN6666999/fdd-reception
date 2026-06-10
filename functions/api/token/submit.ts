@@ -1,12 +1,7 @@
 import { generateId } from '../../utils/id'
 import { encrypt } from '../../utils/crypto'
 import { SubmissionSchema } from '../../../contracts/submission.schema'
-
-interface Env {
-  DB: D1Database
-  ENCRYPTION_KEY: string
-  SESSION_ROOM: DurableObjectNamespace
-}
+import type { Env } from '../../types/env'
 
 export async function handleSubmit(request: Request, env: Env, tokenId: string): Promise<Response> {
   const token = await env.DB.prepare(`SELECT * FROM tokens WHERE id = ?`).bind(tokenId).first()

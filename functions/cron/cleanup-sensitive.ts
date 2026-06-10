@@ -1,6 +1,5 @@
 import { generateId } from '../utils/id'
-
-interface Env { DB: D1Database }
+import type { Env } from '../types/env'
 
 export async function handleCleanupSensitive(env: Env): Promise<void> {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()

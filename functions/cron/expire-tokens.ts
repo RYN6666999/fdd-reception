@@ -1,6 +1,5 @@
 import { generateId } from '../utils/id'
-
-interface Env { DB: D1Database; SESSION_ROOM: DurableObjectNamespace }
+import type { Env } from '../types/env'
 
 export async function handleExpireTokens(env: Env): Promise<void> {
   const now = new Date().toISOString()

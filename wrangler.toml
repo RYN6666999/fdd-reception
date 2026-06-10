@@ -19,6 +19,13 @@ class_name = "SessionRoom"
 tag = "v1"
 new_sqlite_classes = ["SessionRoom"]
 
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "fdd-reception-photos"
+
+[ai]
+binding = "AI"
+
 [triggers]
 crons = ["* * * * *", "0 2 * * *"]
 

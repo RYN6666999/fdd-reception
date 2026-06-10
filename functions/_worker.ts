@@ -9,13 +9,7 @@ import { handleOperatorHistory } from './api/operator/history'
 import { handleRedirect } from './api/token/redirect'
 import { handleExpireTokens } from './cron/expire-tokens'
 import { handleCleanupSensitive } from './cron/cleanup-sensitive'
-
-interface Env {
-  DB: D1Database
-  ENCRYPTION_KEY: string
-  SESSION_ROOM: DurableObjectNamespace
-  ASSETS: { fetch: (req: Request) => Promise<Response> }
-}
+import type { Env } from './types/env'
 
 export { SessionRoom } from './durable-objects/session-room'
 
@@ -46,6 +40,7 @@ export default {
 
     // GET /api/operator/history
     if (method === 'GET' && path === '/api/operator/history') return handleOperatorHistory(request, env)
+
 
     // WebSocket: GET /api/session/:id/ws → proxy to Durable Object
     const sessionMatch = path.match(/^\/api\/session\/([^/]+)\/ws$/)

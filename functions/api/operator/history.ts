@@ -1,4 +1,4 @@
-interface Env { DB: D1Database }
+import type { Env } from '../../types/env'
 
 export async function handleOperatorHistory(request: Request, env: Env): Promise<Response> {
   const operatorId = request.headers.get('Authorization')?.replace('Bearer ', '')

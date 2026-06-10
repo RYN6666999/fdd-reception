@@ -1,4 +1,4 @@
-interface Env { DB: D1Database; BASE_URL: string }
+import type { Env } from '../../types/env'
 
 export async function handleRedirect(request: Request, env: Env, shortCode: string): Promise<Response> {
   const token = await env.DB.prepare(
