@@ -21,6 +21,21 @@ type RelayEventRow = {
   created_at: number
 }
 
+type RelayTunnelStatusRow = {
+  check_name: string
+  last_check_ts: number
+  last_ok_ts: number | null
+  last_fail_ts: number | null
+  outage_started_ts: number | null
+  consecutive_failures: number
+  last_error: string | null
+  last_http_status: number | null
+  last_latency_ms: number | null
+  total_checks: number
+  total_failures: number
+  updated_at: number
+}
+
 const MAX_RETRIES = 3
 const BASE_BACKOFF_MS = 400
 
@@ -229,11 +244,62 @@ export async function handleRelayAdminStatus(env: Env, startedAtMs: number): Pro
   const byStatus = Object.fromEntries(byStatusRows.results.map(r => [r.status, r.count]))
   const bySource = Object.fromEntries(bySourceRows.results.map(r => [r.source, r.count]))
 
+  let tunnelStatus: Record<string, unknown> = {
+    status: 'unknown',
+    reason: 'not_checked_yet',
+    probe_interval_sec: 300,
+  }
+
+  try {
+    const statusRow = await env.DB.prepare(
+      `SELECT check_name, last_check_ts, last_ok_ts, last_fail_ts, outage_started_ts,
+              consecutive_failures, last_error, last_http_status, last_latency_ms,
+              total_checks, total_failures, updated_at
+       FROM relay_system_status
+       WHERE check_name = ?`
+    ).bind('aris_api_tunnel').first<RelayTunnelStatusRow>()
+
+    if (statusRow) {
+      const degraded = statusRow.consecutive_failures > 0
+      const now = nowSec()
+      const outageSec = statusRow.outage_started_ts ? Math.max(0, Math.round(now - statusRow.outage_started_ts)) : 0
+      const failureRate = statusRow.total_checks > 0
+        ? Math.round((statusRow.total_failures / statusRow.total_checks) * 1000) / 1000
+        : 0
+
+      tunnelStatus = {
+        status: degraded ? 'degraded' : 'ok',
+        check_name: statusRow.check_name,
+        probe_interval_sec: 300,
+        last_check_ts: statusRow.last_check_ts,
+        last_ok_ts: statusRow.last_ok_ts,
+        last_fail_ts: statusRow.last_fail_ts,
+        outage_started_ts: statusRow.outage_started_ts,
+        outage_duration_sec: outageSec,
+        consecutive_failures: statusRow.consecutive_failures,
+        last_error: statusRow.last_error,
+        last_http_status: statusRow.last_http_status,
+        last_latency_ms: statusRow.last_latency_ms,
+        total_checks: statusRow.total_checks,
+        total_failures: statusRow.total_failures,
+        failure_rate: failureRate,
+      }
+    }
+  } catch (error) {
+    tunnelStatus = {
+      status: 'unknown',
+      reason: 'monitor_table_unavailable',
+      detail: error instanceof Error ? error.message : String(error),
+      probe_interval_sec: 300,
+    }
+  }
+
   return json({
     total_events: totalRow?.total_events ?? 0,
     by_status: byStatus,
     by_source: bySource,
     uptime: Math.round((Date.now() - startedAtMs) / 100) / 10,
+    aris_api_tunnel: tunnelStatus,
   })
 }
 

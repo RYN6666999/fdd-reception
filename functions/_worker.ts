@@ -17,6 +17,7 @@ import {
 } from './api/relay'
 import { handleExpireTokens } from './cron/expire-tokens'
 import { handleCleanupSensitive } from './cron/cleanup-sensitive'
+import { handleRelayTunnelProbe } from './cron/relay-tunnel-probe'
 import type { Env } from './types/env'
 
 export { SessionRoom } from './durable-objects/session-room'
@@ -130,6 +131,7 @@ i.addEventListener('keydown',e=>{if(e.key==='Enter')sendMsg()});
 
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     if (event.cron === '* * * * *') ctx.waitUntil(handleExpireTokens(env))
+    if (event.cron === '*/5 * * * *') ctx.waitUntil(handleRelayTunnelProbe(env))
     if (event.cron === '0 2 * * *') ctx.waitUntil(handleCleanupSensitive(env))
   }
 }

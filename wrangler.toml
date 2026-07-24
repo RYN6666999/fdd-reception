@@ -38,5 +38,5 @@ pattern = "aris-live.3141919ryanfeofjpewfp.uk/*"
 zone_name = "3141919ryanfeofjpewfp.uk"
 
 [triggers]
-crons = ["* * * * *", "0 2 * * *"]
+crons = ["* * * * *", "*/5 * * * *", "0 2 * * *"]
 
