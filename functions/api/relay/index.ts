@@ -21,6 +21,13 @@ type RelayEventRow = {
   created_at: number
 }
 
+type RelayRecentMetricsRow = {
+  status: string
+  receive_ts: number
+  process_ts: number | null
+  deliver_ts: number | null
+}
+
 type RelayTunnelStatusRow = {
   check_name: string
   last_check_ts: number
@@ -241,6 +248,48 @@ export async function handleRelayAdminStatus(env: Env, startedAtMs: number): Pro
     `SELECT source, COUNT(*) AS count FROM relay_events GROUP BY source`
   ).all<{ source: string; count: number }>()
 
+  const recentLimit = 50
+  const recentRows = await env.DB.prepare(
+    `SELECT status, receive_ts, process_ts, deliver_ts
+     FROM relay_events
+     ORDER BY created_at DESC
+     LIMIT ?`
+  ).bind(recentLimit).all<RelayRecentMetricsRow>()
+
+  const latencyMsValues: number[] = []
+  const responseMsValues: number[] = []
+  let errorCount = 0
+
+  for (const row of recentRows.results) {
+    const receive = row.receive_ts
+    const endTs = row.deliver_ts ?? row.process_ts ?? row.receive_ts
+    const latencyMs = Math.max(0, Math.round((endTs - receive) * 1000))
+    latencyMsValues.push(latencyMs)
+
+    if (row.status !== 'delivered') errorCount += 1
+
+    if (row.deliver_ts !== null) {
+      const responseStart = row.process_ts ?? row.receive_ts
+      const responseMs = Math.max(0, Math.round((row.deliver_ts - responseStart) * 1000))
+      responseMsValues.push(responseMs)
+    }
+  }
+
+  latencyMsValues.sort((a, b) => a - b)
+  responseMsValues.sort((a, b) => a - b)
+
+  const pickPercentile = (values: number[], percentile: number): number => {
+    if (values.length === 0) return 0
+    const index = Math.min(values.length - 1, Math.max(0, Math.ceil((percentile / 100) * values.length) - 1))
+    return values[index] ?? 0
+  }
+
+  const avg = (values: number[]): number => {
+    if (values.length === 0) return 0
+    const total = values.reduce((sum, value) => sum + value, 0)
+    return Math.round((total / values.length) * 10) / 10
+  }
+
   const byStatus = Object.fromEntries(byStatusRows.results.map(r => [r.status, r.count]))
   const bySource = Object.fromEntries(bySourceRows.results.map(r => [r.source, r.count]))
 
@@ -298,6 +347,23 @@ export async function handleRelayAdminStatus(env: Env, startedAtMs: number): Pro
     total_events: totalRow?.total_events ?? 0,
     by_status: byStatus,
     by_source: bySource,
+    recent_event_metrics: {
+      sample_size: recentRows.results.length,
+      limit: recentLimit,
+      error_rate: recentRows.results.length > 0
+        ? Math.round((errorCount / recentRows.results.length) * 1000) / 1000
+        : 0,
+      latency_ms: {
+        avg: avg(latencyMsValues),
+        p50: pickPercentile(latencyMsValues, 50),
+        p95: pickPercentile(latencyMsValues, 95),
+      },
+      response_ms: {
+        avg: avg(responseMsValues),
+        p50: pickPercentile(responseMsValues, 50),
+        p95: pickPercentile(responseMsValues, 95),
+      },
+    },
     uptime: Math.round((Date.now() - startedAtMs) / 100) / 10,
     aris_api_tunnel: tunnelStatus,
   })
