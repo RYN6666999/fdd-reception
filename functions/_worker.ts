@@ -8,11 +8,20 @@ import { handleGetCard } from './api/token/card'
 import { handleOperatorHistory } from './api/operator/history'
 import { handleRedirect } from './api/token/redirect'
 import { handlePhotoUpload } from './api/token/photo'
+import {
+  handleRelayAdminStatus,
+  handleRelayChat,
+  handleRelayEvents,
+  handleRelayHealth,
+  handleRelayOptions,
+} from './api/relay'
 import { handleExpireTokens } from './cron/expire-tokens'
 import { handleCleanupSensitive } from './cron/cleanup-sensitive'
 import type { Env } from './types/env'
 
 export { SessionRoom } from './durable-objects/session-room'
+
+const STARTED_AT_MS = Date.now()
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -42,6 +51,16 @@ export default {
 
     // GET /api/operator/history
     if (method === 'GET' && path === '/api/operator/history') return handleOperatorHistory(request, env)
+
+    // Relay endpoints
+    if (method === 'OPTIONS' && (path === '/c' || path === '/health' || path === '/admin/status' || path.startsWith('/events/'))) {
+      return handleRelayOptions()
+    }
+    if (method === 'POST' && path === '/c') return handleRelayChat(request, env)
+    if (method === 'GET' && path === '/health') return handleRelayHealth(STARTED_AT_MS)
+    if (method === 'GET' && path === '/admin/status') return handleRelayAdminStatus(env, STARTED_AT_MS)
+    const eventsMatch = path.match(/^\/events\/([^/]+)$/)
+    if (eventsMatch && method === 'GET') return handleRelayEvents(env, decodeURIComponent(eventsMatch[1]!))
 
 
     // WebSocket: GET /api/session/:id/ws → proxy to Durable Object
