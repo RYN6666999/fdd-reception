@@ -33,6 +33,10 @@ ARIS_API_URL = "https://aris-api.3141919ryanfeofjpewfp.uk/v1/chat/completions"
 pattern = "aris.3141919ryanfeofjpewfp.uk/*"
 zone_name = "3141919ryanfeofjpewfp.uk"
 
+[[routes]]
+pattern = "aris-live.3141919ryanfeofjpewfp.uk/*"
+zone_name = "3141919ryanfeofjpewfp.uk"
+
 [triggers]
 crons = ["* * * * *", "0 2 * * *"]
 
