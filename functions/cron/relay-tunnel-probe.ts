@@ -1,6 +1,6 @@
 import type { Env } from '../types/env'
 
-type TunnelStatusRow = {
+export type TunnelStatusRow = {
   check_name: string
   last_check_ts: number
   last_ok_ts: number | null
@@ -15,7 +15,7 @@ type TunnelStatusRow = {
   updated_at: number
 }
 
-const CHECK_NAME = 'aris_api_tunnel'
+export const RELAY_TUNNEL_CHECK_NAME = 'aris_api_tunnel'
 const DEFAULT_API_URL = 'https://aris-api.3141919ryanfeofjpewfp.uk/v1/chat/completions'
 const PROBE_TIMEOUT_MS = 8000
 
@@ -75,7 +75,7 @@ export async function handleRelayTunnelProbe(env: Env): Promise<void> {
             total_checks, total_failures, updated_at
      FROM relay_system_status
      WHERE check_name = ?`
-  ).bind(CHECK_NAME).first<TunnelStatusRow>()
+  ).bind(RELAY_TUNNEL_CHECK_NAME).first<TunnelStatusRow>()
 
   const totalChecks = (previous?.total_checks ?? 0) + 1
   const totalFailures = (previous?.total_failures ?? 0) + (result.ok ? 0 : 1)
@@ -105,7 +105,7 @@ export async function handleRelayTunnelProbe(env: Env): Promise<void> {
       total_failures = excluded.total_failures,
       updated_at = excluded.updated_at`
   ).bind(
-    CHECK_NAME,
+    RELAY_TUNNEL_CHECK_NAME,
     checkTs,
     lastOkTs,
     lastFailTs,
@@ -118,4 +118,16 @@ export async function handleRelayTunnelProbe(env: Env): Promise<void> {
     totalFailures,
     checkTs,
   ).run()
+}
+
+export async function readRelayTunnelStatus(env: Env): Promise<TunnelStatusRow | null> {
+  const row = await env.DB.prepare(
+    `SELECT check_name, last_check_ts, last_ok_ts, last_fail_ts, outage_started_ts,
+            consecutive_failures, last_error, last_http_status, last_latency_ms,
+            total_checks, total_failures, updated_at
+     FROM relay_system_status
+     WHERE check_name = ?`
+  ).bind(RELAY_TUNNEL_CHECK_NAME).first<TunnelStatusRow>()
+
+  return row ?? null
 }

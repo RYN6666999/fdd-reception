@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a7f57" />
+    <title>Aris Relay</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+    <link rel="stylesheet" href="/relay-ui/app.css" />
+  </head>
+  <body>
+    <div class="page-bg" aria-hidden="true"></div>
+
+    <main class="chat-shell">
+      <header class="chat-header">
+        <div class="brand-dot"></div>
+        <div>
+          <h1>Aris Relay</h1>
+          <p class="sub">Worker Online</p>
+        </div>
+        <button id="installBtn" class="install-btn" type="button" hidden>Install</button>
+      </header>
+
+      <section id="timeline" class="timeline" aria-live="polite">
+        <article class="msg bot">
+          <p>Worker Relay 已啟動。跟我說說你想做什麼。</p>
+          <time>just now</time>
+        </article>
+      </section>
+
+      <div id="typing" class="typing" hidden>
+        <span></span><span></span><span></span>
+      </div>
+
+      <form id="composer" class="composer" autocomplete="off">
+        <input id="messageInput" name="message" type="text" placeholder="輸入訊息..." maxlength="1200" required />
+        <button id="sendBtn" type="submit" aria-label="send message">➤</button>
+      </form>
+    </main>
+
+    <script type="module" src="/relay-ui/app.js"></script>
+  </body>
+</html>

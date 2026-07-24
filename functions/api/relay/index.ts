@@ -1,4 +1,8 @@
 import type { Env } from '../../types/env'
+import {
+  handleRelayTunnelProbe,
+  readRelayTunnelStatus,
+} from '../../cron/relay-tunnel-probe'
 
 type RelayEventRow = {
   event_id: string
@@ -28,23 +32,9 @@ type RelayRecentMetricsRow = {
   deliver_ts: number | null
 }
 
-type RelayTunnelStatusRow = {
-  check_name: string
-  last_check_ts: number
-  last_ok_ts: number | null
-  last_fail_ts: number | null
-  outage_started_ts: number | null
-  consecutive_failures: number
-  last_error: string | null
-  last_http_status: number | null
-  last_latency_ms: number | null
-  total_checks: number
-  total_failures: number
-  updated_at: number
-}
-
 const MAX_RETRIES = 3
 const BASE_BACKOFF_MS = 400
+const ADMIN_PROBE_HEADER = 'X-Admin-Probe-Token'
 
 function nowSec(): number {
   return Date.now() / 1000
@@ -74,6 +64,15 @@ function json(data: unknown, status = 200): Response {
       'Access-Control-Allow-Headers': 'Content-Type',
     },
   })
+}
+
+function secureEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return diff === 0
 }
 
 function parseArisReply(raw: unknown): string {
@@ -300,13 +299,7 @@ export async function handleRelayAdminStatus(env: Env, startedAtMs: number): Pro
   }
 
   try {
-    const statusRow = await env.DB.prepare(
-      `SELECT check_name, last_check_ts, last_ok_ts, last_fail_ts, outage_started_ts,
-              consecutive_failures, last_error, last_http_status, last_latency_ms,
-              total_checks, total_failures, updated_at
-       FROM relay_system_status
-       WHERE check_name = ?`
-    ).bind('aris_api_tunnel').first<RelayTunnelStatusRow>()
+    const statusRow = await readRelayTunnelStatus(env)
 
     if (statusRow) {
       const degraded = statusRow.consecutive_failures > 0
@@ -369,6 +362,41 @@ export async function handleRelayAdminStatus(env: Env, startedAtMs: number): Pro
   })
 }
 
+export async function handleRelayAdminProbe(request: Request, env: Env): Promise<Response> {
+  const configuredToken = env.ADMIN_PROBE_TOKEN
+  if (!configuredToken || configuredToken.trim().length === 0) {
+    return json({ error: 'admin_probe_disabled' }, 503)
+  }
+
+  const requestToken = request.headers.get(ADMIN_PROBE_HEADER) || ''
+  if (!secureEqual(requestToken, configuredToken)) {
+    return json({ error: 'unauthorized' }, 401)
+  }
+
+  await handleRelayTunnelProbe(env)
+
+  const latest = await readRelayTunnelStatus(env)
+  if (!latest) {
+    return json({ ok: true, triggered: true, status: 'unknown' })
+  }
+
+  return json({
+    ok: true,
+    triggered: true,
+    check_name: latest.check_name,
+    last_check_ts: latest.last_check_ts,
+    last_ok_ts: latest.last_ok_ts,
+    last_fail_ts: latest.last_fail_ts,
+    outage_started_ts: latest.outage_started_ts,
+    consecutive_failures: latest.consecutive_failures,
+    last_error: latest.last_error,
+    last_http_status: latest.last_http_status,
+    last_latency_ms: latest.last_latency_ms,
+    total_checks: latest.total_checks,
+    total_failures: latest.total_failures,
+  })
+}
+
 export async function handleRelayEvents(env: Env, conversationId: string): Promise<Response> {
   const data = await env.DB.prepare(
     `SELECT event_id, idempotency_key, source, conversation_id, user_id,
@@ -404,7 +432,7 @@ export function handleRelayOptions(): Response {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Probe-Token',
     },
   })
 }

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Aris Relay Icon">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2bba79"/>
+      <stop offset="1" stop-color="#1a7f57"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="#ecf8f1"/>
+  <path d="M92 160c0-31 25-56 56-56h216c31 0 56 25 56 56v152c0 31-25 56-56 56H241l-70 58c-11 9-27 1-27-13v-45h4c-31 0-56-25-56-56z" fill="url(#g)"/>
+  <circle cx="190" cy="237" r="24" fill="#ffffff"/>
+  <circle cx="256" cy="237" r="24" fill="#ffffff"/>
+  <circle cx="322" cy="237" r="24" fill="#ffffff"/>
+</svg>
