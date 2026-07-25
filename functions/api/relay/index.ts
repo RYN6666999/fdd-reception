@@ -95,6 +95,19 @@ async function sleep(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms))
 }
 
+// 乙的種子：請 Aris 在回覆末尾附一句 forward-looking 注意力線（laap-core 只讀 user 內容）。
+const ATTENTION_MARKER = '⟶下一步'
+const ATTENTION_INSTRUCTION =
+  '\n\n（回應完後，另起一行以 ⟶下一步: 開頭，寫一句你接下來想做什麼、或現在懸著沒解決的問題，簡短一句，給下次醒來的你當線索。）'
+
+function splitAttention(reply: string): { body: string; attention: string } {
+  const idx = reply.lastIndexOf(ATTENTION_MARKER)
+  if (idx < 0) return { body: reply.trim(), attention: '' }
+  const body = reply.slice(0, idx).trim()
+  const line = reply.slice(idx).split('\n')[0].replace(ATTENTION_MARKER, '').replace(/^[：:\s]+/, '').trim()
+  return { body, attention: line }
+}
+
 async function callArisWithRetry(env: Env, text: string): Promise<string> {
   const url = arisApiUrl(env)
   let lastError = 'unknown_error'
@@ -106,7 +119,7 @@ async function callArisWithRetry(env: Env, text: string): Promise<string> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'laap-core',
-          messages: [{ role: 'user', content: text }],
+          messages: [{ role: 'user', content: text + ATTENTION_INSTRUCTION }],
         }),
       })
 
@@ -168,6 +181,7 @@ type MemoryEntry = {
   source_id: string
   origin: 'human' | 'auto_generated'
   provenance: string
+  attention_line?: string
 }
 
 // Best-effort write to the local aris-memory API (over the aris-mem tunnel).
@@ -247,10 +261,12 @@ export async function handleRelayChat(request: Request, env: Env): Promise<Respo
   await storeMemory(env, { source: 'webchat', content: text, tags: [conv], source_id: messageId, origin: 'human', provenance: conv })
 
   try {
-    const reply = await callArisWithRetry(env, text)
+    const raw = await callArisWithRetry(env, text)
+    // 乙的種子：切出 forward-looking 注意力線，body 給使用者、attention 進 memory。
+    const { body: reply, attention } = splitAttention(raw)
     await markDelivered(env, eventId, reply)
     // origin=auto_generated: Aris reply is provisional (gate caps it at 🟡), never auto-fact.
-    await storeMemory(env, { source: 'aris-self', content: reply, tags: [conv], source_id: eventId, origin: 'auto_generated', provenance: conv })
+    await storeMemory(env, { source: 'aris-self', content: reply, tags: [conv], source_id: eventId, origin: 'auto_generated', provenance: conv, attention_line: attention })
     return json({ event_id: eventId, reply, status: 'delivered' })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
