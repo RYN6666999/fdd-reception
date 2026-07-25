@@ -28,6 +28,7 @@ binding = "AI"
 
 [vars]
 ARIS_API_URL = "https://aris-api.3141919ryanfeofjpewfp.uk/v1/chat/completions"
+ARIS_MEMORY_URL = "https://aris-mem.3141919ryanfeofjpewfp.uk"
 
 [[routes]]
 pattern = "aris.3141919ryanfeofjpewfp.uk/*"

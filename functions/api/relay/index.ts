@@ -161,6 +161,30 @@ async function markDeadLetter(env: Env, eventId: string, error: string): Promise
   ).bind(error, MAX_RETRIES, eventId).run()
 }
 
+type MemoryEntry = {
+  source: string
+  content: string
+  tags: string[]
+  source_id: string
+}
+
+// Best-effort write to the local aris-memory API (over the aris-mem tunnel).
+// Graceful degradation: never throws, never blocks the chat reply on failure.
+async function storeMemory(env: Env, entry: MemoryEntry): Promise<void> {
+  const base = env.ARIS_MEMORY_URL
+  if (!base || entry.content.trim().length === 0) return
+
+  try {
+    await fetch(`${base.replace(/\/$/, '')}/memories/store`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    })
+  } catch (error) {
+    console.warn('aris-memory store failed', entry.source, error instanceof Error ? error.message : String(error))
+  }
+}
+
 export async function handleRelayChat(request: Request, env: Env): Promise<Response> {
   let body: { text?: unknown; conv?: unknown; uid?: unknown }
   try {
@@ -216,9 +240,13 @@ export async function handleRelayChat(request: Request, env: Env): Promise<Respo
 
   await markProcessing(env, eventId)
 
+  // User turn always lands in memory (tagged by conversation), even if Aris fails.
+  await storeMemory(env, { source: 'webchat', content: text, tags: [conv], source_id: messageId })
+
   try {
     const reply = await callArisWithRetry(env, text)
     await markDelivered(env, eventId, reply)
+    await storeMemory(env, { source: 'aris-self', content: reply, tags: [conv], source_id: eventId })
     return json({ event_id: eventId, reply, status: 'delivered' })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
