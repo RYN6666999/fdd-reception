@@ -166,6 +166,8 @@ type MemoryEntry = {
   content: string
   tags: string[]
   source_id: string
+  origin: 'human' | 'auto_generated'
+  provenance: string
 }
 
 // Best-effort write to the local aris-memory API (over the aris-mem tunnel).
@@ -241,12 +243,14 @@ export async function handleRelayChat(request: Request, env: Env): Promise<Respo
   await markProcessing(env, eventId)
 
   // User turn always lands in memory (tagged by conversation), even if Aris fails.
-  await storeMemory(env, { source: 'webchat', content: text, tags: [conv], source_id: messageId })
+  // origin=human: user-said, not an auto-generated claim.
+  await storeMemory(env, { source: 'webchat', content: text, tags: [conv], source_id: messageId, origin: 'human', provenance: conv })
 
   try {
     const reply = await callArisWithRetry(env, text)
     await markDelivered(env, eventId, reply)
-    await storeMemory(env, { source: 'aris-self', content: reply, tags: [conv], source_id: eventId })
+    // origin=auto_generated: Aris reply is provisional (gate caps it at 🟡), never auto-fact.
+    await storeMemory(env, { source: 'aris-self', content: reply, tags: [conv], source_id: eventId, origin: 'auto_generated', provenance: conv })
     return json({ event_id: eventId, reply, status: 'delivered' })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
